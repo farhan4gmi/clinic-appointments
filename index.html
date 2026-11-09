@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Therapy Clinic Appointments</title>
+<style>
+:root{--bg:#f4f7f6;--card:#fff;--tx:#15302b;--mut:#5f7a74;--pri:#0f766e;--pri-tx:#fff;--bd:#d9e4e1;--soft:#e3f2ef;--dng:#b42318;--wa:#25d366;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1a18;--card:#16262a;--tx:#e6f2ef;--mut:#93b0aa;--pri:#2dd4bf;--pri-tx:#06211d;--bd:#26403f;--soft:#1b3433;--dng:#f97066}}
+:root[data-theme="dark"]{--bg:#0e1a18;--card:#16262a;--tx:#e6f2ef;--mut:#93b0aa;--pri:#2dd4bf;--pri-tx:#06211d;--bd:#26403f;--soft:#1b3433;--dng:#f97066}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
+header{padding:20px 16px 4px;max-width:1000px;margin:auto}
+h1{margin:0;font-size:1.5rem}header p{margin:4px 0 0;color:var(--mut)}
+main{max-width:1000px;margin:auto;padding:12px 16px 32px;display:grid;gap:16px;grid-template-columns:1fr}
+@media(min-width:820px){main{grid-template-columns:380px 1fr}}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px}
+h2{margin:0 0 12px;font-size:1.1rem}
+label{display:block;font-size:.85rem;color:var(--mut);margin:10px 0 4px}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:9px;background:var(--bg);color:var(--tx);font:inherit}
+textarea{resize:vertical;min-height:70px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{font:inherit;cursor:pointer;border:0;border-radius:9px;padding:11px 14px}
+.pri{background:var(--pri);color:var(--pri-tx);width:100%;margin-top:14px;font-weight:600}
+.wa{background:var(--wa);color:#06260f;font-weight:700;display:block;text-align:center;text-decoration:none;padding:12px;border-radius:9px}
+.ghost{background:var(--soft);color:var(--tx)}
+.err{color:var(--dng);font-size:.85rem;min-height:1.2em;margin-top:8px}
+.nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.nav button{background:var(--soft);color:var(--tx);padding:6px 12px}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.dow{font-size:.75rem;color:var(--mut);padding:4px 0}
+.day{aspect-ratio:1;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);padding:2px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.9rem}
+.day.off{visibility:hidden}.day.past{opacity:.4}.wait{opacity:.5;pointer-events:none}.day.today{border-color:var(--pri);border-width:2px}
+.day.sel{background:var(--pri);color:var(--pri-tx)}
+.day small{font-size:.65rem;background:var(--soft);color:var(--tx);border-radius:8px;padding:0 6px;margin-top:2px}
+.item{border:1px solid var(--bd);border-radius:10px;padding:10px;margin-top:8px;display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.item b{display:block}.item span{color:var(--mut);font-size:.85rem}
+.acts{display:flex;gap:6px}.acts button,.acts a{padding:6px 10px;font-size:.8rem;border-radius:7px}
+.del{background:transparent;color:var(--dng);border:1px solid var(--dng)}
+.acts a.wa{padding:6px 10px}.edit{background:var(--soft);color:var(--tx)}.full{grid-column:1/-1}
+.bd{font-style:normal;font-size:.7rem;background:var(--soft);border-radius:8px;padding:1px 8px;margin-left:6px}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
+#modal.open{display:flex}
+.box{background:var(--card);border-radius:16px;padding:22px;max-width:400px;width:100%;text-align:center}
+.box .tick{font-size:2.4rem}.box dl{text-align:left;background:var(--bg);border-radius:10px;padding:10px 14px;margin:12px 0}
+.box dt{font-size:.75rem;color:var(--mut)}.box dd{margin:0 0 6px;font-weight:600}
+.box .stack{display:grid;gap:8px}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+</head>
+<body>
+<header><h1 id="hd"></h1><p id="tg"></p><p id="who" style="font-size:.8rem;color:var(--mut);margin:2px 0 0"></p></header>
+<main>
+<section class="card">
+  <h2 id="fh">New Appointment</h2>
+  <div id="f">
+    <label for="name">Full Name</label><input id="name" placeholder="Patient’s full name" autocomplete="name">
+    <label for="phone">Mobile / WhatsApp Number</label><input id="phone" type="tel" placeholder="03xx xxxxxxx" autocomplete="tel">
+    <label for="svc">Therapy Service</label>
+    <select id="svc"><option>Physiotherapy</option><option>Speech Therapy</option><option>Occupational Therapy</option><option>Psychological Counseling</option><option>Behavioral Therapy</option></select>
+    <div class="row">
+      <div><label for="date">Date</label><input id="date" type="date"></div>
+      <div><label for="time">Time</label><select id="time"></select></div>
+    </div>
+    <label for="reason">Reason for Appointment</label><textarea id="reason" placeholder="Briefly describe the reason for the visit"></textarea>
+    <div class="err" id="err"></div>
+    <button class="pri" id="save">Book Appointment</button>
+    <button class="ghost" id="cedit" style="display:none;width:100%;margin-top:8px">Cancel Edit</button>
+  </div>
+</section>
+<section class="card">
+  <div class="nav"><button id="prev" aria-label="Previous month">‹</button><h2 id="mt" style="margin:0"></h2><button id="next" aria-label="Next month">›</button></div>
+  <div class="grid" id="cal"></div>
+  <h2 id="dt" style="margin-top:18px"></h2>
+  <div id="list"></div>
+</section>
+<section class="card full"><h2 id="ah">All Appointments</h2>
+<div style="margin-bottom:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="ghost" id="xls">⬇ Download Excel</button><span id="gst" style="color:var(--mut);font-size:.85rem"></span></div><div id="all"></div></section>
+</main>
+
+<div id="lock" style="position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;padding:16px;z-index:30"><div class="box"><h2>Staff Sign In</h2><input id="le1" type="email" placeholder="Email" autocomplete="username" style="margin-bottom:8px"><input id="lp" type="password" placeholder="Password" autocomplete="current-password"><button class="pri" id="lgo">Sign in</button><div class="err" id="lerr"></div></div></div>
+<div id="modal" role="dialog" aria-modal="true"><div class="box">
+  <div class="tick">✅</div><h2 id="mh">Appointment Confirmed</h2>
+  <dl id="sum"></dl>
+  <p id="xs" style="font-size:.8rem;color:var(--mut);margin:0 0 12px"></p>
+  <p style="font-size:.85rem;margin:0 0 12px">Please send the confirmation on WhatsApp to complete the booking.</p>
+  <a class="wa" id="wa" target="_blank" rel="noopener">Send WhatsApp Message</a>
+</div></div>
+
+<script>
+var DEF={clinic:"Wellness Therapy Clinic",tagline:"Appointment booking & calendar",emoji:"🌿",logo:"",color:"#0f766e",
+L:{formTitle:"New Appointment",editTitle:"Edit Appointment",book:"Book Appointment",update:"Update Appointment",name:"Full Name",phone:"Mobile / WhatsApp Number",svc:"Therapy Service",date:"Date",time:"Time",reason:"Reason for Appointment",allTitle:"All Appointments"},
+P:{name:"Patient’s full name",phone:"e.g. 0300 1234567",reason:"Briefly describe the reason for the visit"},
+services:["Physiotherapy","Speech Therapy","Occupational Therapy","Psychological Counseling","Behavioral Therapy"],
+statuses:["Scheduled","Completed","Cancelled","No-show"],start:"10:00",end:"18:00",step:30,closed:[],
+wa:"Dear {name},\n\nYour appointment at {clinic} has been confirmed.\n\nService: {service}\nDate: {date}\nTime: {time}\nReason: {reason}\n\nPlease arrive 10 minutes before your scheduled time. If you need to reschedule, kindly contact us in advance.\n\nThank you,\n{clinic}"};
+function cfgLoad(){var c={};try{c=JSON.parse(localStorage.getItem("clinic_config_v1"))||{}}catch(e){}var d=JSON.parse(JSON.stringify(DEF));for(var k in c){if(k=="L"||k=="P")Object.assign(d[k],c[k]);else d[k]=c[k]}return d}
+function toM(t){var p=t.split(":");return +p[0]*60+ +p[1]}
+function live(a){return a.status!=="Cancelled"}
+function applyCfg(){
+ document.title=CLINIC+" – Appointments";
+ $("hd").innerHTML=(C.logo?'<img src="'+esc(C.logo)+'" alt="" style="height:1.3em;vertical-align:-.2em;border-radius:6px"> ':(C.emoji?esc(C.emoji)+" ":""))+esc(CLINIC);
+ $("tg").textContent=C.tagline;
+ if(C.color&&C.color!=="#0f766e"){var r=document.documentElement.style;r.setProperty("--pri",C.color);r.setProperty("--pri-tx","#fff")}
+ ["name","phone","svc","date","time","reason"].forEach(function(k){document.querySelector('label[for="'+k+'"]').textContent=L[k]});
+ ["name","phone","reason"].forEach(function(k){$(k).placeholder=C.P[k]});
+ $("svc").innerHTML=C.services.map(function(x){return "<option>"+esc(x)+"</option>"}).join("");
+ $("ah").textContent=L.allTitle;$("fh").textContent=L.formTitle;$("save").textContent=L.book;
+}
+var C=cfgLoad(),L=C.L,CLINIC=C.clinic,editId=null,KEY="clinic_appts_v1",mem=[];
+var SLOTS=[];for(var m=toM(C.start);m+C.step<=toM(C.end);m+=C.step)SLOTS.push(pad(Math.floor(m/60))+":"+pad(m%60));
+function $(i){return document.getElementById(i)}
+function load(){try{var r=localStorage.getItem(KEY);return r?JSON.parse(r):mem}catch(e){return mem}}
+function store(a){mem=a;try{localStorage.setItem(KEY,JSON.stringify(a))}catch(e){}}
+function pad(n){return String(n).padStart(2,"0")}
+function iso(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+function t12(t){var h=+t.slice(0,2);return (h%12||12)+":"+t.slice(3)+" "+(h<12?"AM":"PM")}
+function dlong(s){var p=s.split("-");return new Date(+p[0],p[1]-1,+p[2]).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}
+function waNum(p){var d=p.replace(/\D/g,"");if(d.indexOf("00")==0)d=d.slice(2);else if(d[0]=="0")d="92"+d.slice(1);return d}
+function msg(a){return C.wa.replace(/\{(\w+)\}/g,function(m,k){var v={name:a.name,clinic:CLINIC,service:a.svc,date:dlong(a.date),time:t12(a.time),reason:a.reason,phone:a.phone}[k];return v==null?m:v})}
+function waLink(a){return "https://wa.me/"+waNum(a.phone)+"?text="+encodeURIComponent(msg(a))}
+function gcLink(a){var s=new Date(a.date+"T"+a.time+":00"),e=new Date(s.getTime()+C.step*60000);
+ function f(d){return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+"T"+pad(d.getHours())+pad(d.getMinutes())+"00"}
+ return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent(a.svc+" - "+a.name)+"&dates="+f(s)+"/"+f(e)+"&details="+encodeURIComponent("Patient: "+a.name+"\nPhone: "+a.phone+"\nReason: "+a.reason)+"&location="+encodeURIComponent(CLINIC)}
+
+var today=new Date(),vy=today.getFullYear(),vm=today.getMonth(),sel=iso(today);
+
+function fillTimes(){
+ var d=$("date").value,taken=load().filter(function(a){return live(a)&&a.date==d&&a.id!=editId}).map(function(a){return a.time}).reduce(function(r,x){SLOTS.forEach(function(t){if(toM(x)>=toM(t)&&toM(x)<toM(t)+C.step)r.push(t)});return r},[]),cur=$("time").value;
+ var now=new Date(),nowT=pad(now.getHours())+":"+pad(now.getMinutes()),isToday=d==iso(now);
+ function past(t){return d<iso(now)||(isToday&&t<=nowT)}
+ $("time").innerHTML=(C.closed.indexOf(new Date(d+"T00:00:00").getDay())>-1?[]:SLOTS).map(function(t){var b=taken.indexOf(t)>-1,p=past(t);return '<option value="'+t+'"'+(b||p?" disabled":"")+'>'+t12(t)+(b?" (booked)":p?" (passed)":"")+'</option>'}).join("");
+ if(cur&&taken.indexOf(cur)<0&&!past(cur))$("time").value=cur;
+}
+function renderCal(){
+ var all=load(),cnt={};all.forEach(function(a){if(live(a))cnt[a.date]=(cnt[a.date]||0)+1});
+ $("mt").textContent=new Date(vy,vm,1).toLocaleDateString("en-GB",{month:"long",year:"numeric"});
+ var h=["Su","Mo","Tu","We","Th","Fr","Sa"].map(function(d){return '<div class="dow">'+d+'</div>'}).join("");
+ var first=new Date(vy,vm,1).getDay(),n=new Date(vy,vm+1,0).getDate();
+ for(var i=0;i<first;i++)h+='<div class="day off"></div>';
+ for(var d=1;d<=n;d++){var k=vy+"-"+pad(vm+1)+"-"+pad(d);
+  h+='<button class="day'+(k==iso(new Date())?" today":"")+(k<iso(new Date())?" past":"")+(k==sel?" sel":"")+'" data-d="'+k+'">'+d+(cnt[k]?"<small>"+cnt[k]+"</small>":"")+'</button>'}
+ $("cal").innerHTML=h;
+ $("dt").textContent=dlong(sel);renderAll();
+ var day=all.filter(function(a){return a.date==sel}).sort(function(a,b){return a.time<b.time?-1:1});
+ $("list").innerHTML=day.length?day.map(item).join(""):'<p style="color:var(--mut)">No appointments scheduled for this day.</p>';
+}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+
+$("cal").onclick=function(e){var b=e.target.closest("[data-d]");if(!b)return;sel=b.dataset.d;if(sel>=iso(new Date())){$("date").value=sel;fillTimes()}renderCal()};
+function item(a){var st=a.status||"Scheduled",x=live(a);return '<div class="item"'+(x?'':' style="opacity:.6"')+'><div><b>'+dlong(a.date)+' · '+t12(a.time)+' <em class="bd">'+esc(st)+'</em></b><span>'+esc(a.name)+' · '+esc(a.phone)+'<br>'+esc(a.svc)+' — '+esc(a.reason)+'</span></div><div class="acts">'+(x?'<button class="edit" data-id="'+a.id+'">Edit</button><a class="wa" target="_blank" rel="noopener" href="'+waLink(a)+'">WhatsApp</a><button class="del" data-id="'+a.id+'">Cancel</button>':'')+'</div></div>'}
+function renderAll(){var all=load().slice().sort(function(a,b){return (a.date+a.time)<(b.date+b.time)?-1:1});$("all").innerHTML=all.length?all.map(item).join(""):'<p style="color:var(--mut)">No appointments have been booked yet.</p>'}
+function resetForm(){editId=null;$("save").textContent=L.book;$("fh").textContent=L.formTitle;$("cedit").style.display="none";["name","phone","reason"].forEach(function(i){$(i).value=""});$("err").textContent="";fillTimes()}
+function startEdit(id){var a=load().filter(function(x){return String(x.id)==id})[0];if(!a)return;editId=a.id;$("name").value=a.name;$("phone").value=a.phone;$("svc").value=a.svc;$("reason").value=a.reason;$("date").value=a.date;sel=a.date;var p=sel.split("-");vy=+p[0];vm=p[1]-1;fillTimes();$("time").value=a.time;$("save").textContent=L.update;$("fh").textContent=L.editTitle;$("cedit").style.display="block";$("err").textContent="";renderCal();$("f").scrollIntoView({behavior:"smooth",block:"start"})}
+function act(e){var b=e.target.closest("button[data-id]");if(!b)return;var id=b.dataset.id;if(b.classList.contains("del")){var ap=load().filter(function(a){return String(a.id)==id})[0];if(!ap)return;var cp=Object.assign({},ap,{status:"Cancelled"});(dbOn()?dbSave([cp]):Promise.resolve()).then(function(){store(load().map(function(a){return String(a.id)==id?cp:a}));if(String(editId)==id)resetForm();fillTimes();renderCal();if(!dbOn())saveExcel(load()).then(xMsg).catch(function(){})},function(er){xMsg("Could not cancel: "+er.message)})}else if(b.classList.contains("edit")){startEdit(id)}}
+$("list").onclick=act;$("all").onclick=act;$("cedit").onclick=resetForm;
+$("prev").onclick=function(){vm--;if(vm<0){vm=11;vy--}renderCal()};
+$("next").onclick=function(){vm++;if(vm>11){vm=0;vy++}renderCal()};
+$("date").onchange=function(){sel=$("date").value||sel;var p=sel.split("-");vy=+p[0];vm=p[1]-1;fillTimes();renderCal()};
+
+$("save").onclick=function(){
+ var a={id:Date.now(),name:$("name").value.trim(),phone:$("phone").value.trim(),svc:$("svc").value,date:$("date").value,time:$("time").value,reason:$("reason").value.trim(),status:"Scheduled",created:new Date().toISOString()};
+ var e="";
+ if(C.closed.indexOf(new Date(a.date+"T00:00:00").getDay())>-1)e="The clinic is closed on this day.";else if(!a.name)e="Please enter the patient’s full name.";else if(waNum(a.phone).length<11)e="Please enter a valid mobile number.";
+ else if(!a.date)e="Please select a date.";else if(!a.time)e="No time slots are available on this date. Please choose another date.";
+ else if(!a.reason)e="Please enter the reason for the appointment.";
+ else if(a.date<iso(today))e="Past dates cannot be selected.";else if(a.date==iso(new Date())&&a.time<=pad(new Date().getHours())+":"+pad(new Date().getMinutes()))e="This time has already passed. Please select a later time.";
+ else if(load().some(function(x){return live(x)&&x.date==a.date&&x.time==a.time&&x.id!=editId}))e="This time slot is already booked.";
+ $("err").textContent=e;if(e)return;
+ var all=load().slice(),wasEdit=!!editId;if(wasEdit){var o=all.filter(function(x){return x.id==editId})[0]||{};a.id=editId;a.status=o.status||"Scheduled";a.created=o.created||a.created;all=all.map(function(x){return x.id==editId?a:x})}else all.push(a);
+ $("save").disabled=true;
+ (dbOn()?dbSave([a]):Promise.resolve()).then(function(){$("save").disabled=false;store(all);resetForm();done(a,all,wasEdit)},function(er){$("save").disabled=false;$("err").textContent=(er.status==409||er.code=="23505")?"This time slot was just booked by someone else. Please choose another time.":"Could not save to the database: "+er.message;if(dbOn())pull()});
+};
+function done(a,all,wasEdit){
+ $("sum").innerHTML="<dt>Patient</dt><dd>"+esc(a.name)+"</dd><dt>Phone</dt><dd>"+esc(a.phone)+"</dd><dt>Service</dt><dd>"+esc(a.svc)+"</dd><dt>Date &amp; Time</dt><dd>"+dlong(a.date)+", "+t12(a.time)+"</dd><dt>Reason</dt><dd>"+esc(a.reason)+"</dd>";
+ $("wa").href=waLink(a);if(dbOn()){$("xs").textContent="Saved to the database ✓"}else{$("wa").classList.add("wait");$("xs").textContent="Saving to Excel…";saveExcel(all).then(function(m){$("xs").textContent=m}).catch(function(){$("xs").textContent="Could not update the Excel file."}).then(function(){$("wa").classList.remove("wait")})}
+ $("mh").textContent=wasEdit?"Appointment Updated":"Appointment Confirmed";$("modal").classList.add("open");
+ sel=a.date;var p=sel.split("-");vy=+p[0];vm=p[1]-1;
+ ["name","phone","reason"].forEach(function(i){$(i).value=""});
+ fillTimes();renderCal();
+};
+$("wa").onclick=function(){setTimeout(function(){location.reload()},500)};
+
+/* excel */
+function xMsg(t){$("gst").textContent=t}
+function buildWb(A){
+ if(!window.XLSX)return null;
+ var H=["ID","Date","Time","Patient","Phone","Service","Reason","Status","Booked On"],S=function(a){return a.status||"Scheduled"};
+ var ws=XLSX.utils.json_to_sheet(A.map(function(a){return{"ID":String(a.id),"Date":a.date,"Time":t12(a.time),"Patient":a.name,"Phone":String(a.phone),"Service":a.svc,"Reason":a.reason,"Status":S(a),"Booked On":a.created?new Date(a.created).toLocaleString():""}}),{header:H});
+ ws["!cols"]=[16,13,11,24,16,26,36,13,22].map(function(w){return{wch:w}});
+ var rows=[["Summary","Count"],["Total appointments",A.length]];
+ [["Status",S],["Service",function(a){return a.svc}],["Month",function(a){return a.date.slice(0,7)}]].forEach(function(g){rows.push([]);rows.push([g[0],"Count"]);var m={};A.forEach(function(a){var k=g[1](a);m[k]=(m[k]||0)+1});Object.keys(m).sort().forEach(function(k){rows.push([k,m[k]])})});
+ var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Appointments");XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),"Summary");
+ return wb}
+function exportXlsx(A,name){var wb=buildWb(A);if(!wb)return xMsg("Excel library could not load. Please check your internet connection.");XLSX.writeFile(wb,name);xMsg("Excel file downloaded ("+A.length+" appointments).")}
+$("xls").onclick=function(){exportXlsx(load(),"all-appointments.xlsx")};
+
+var XH=null;
+function idb(mode,fn){return new Promise(function(res,rej){var q=indexedDB.open("clinic_xl",1);q.onupgradeneeded=function(){q.result.createObjectStore("h")};q.onerror=function(){rej(q.error)};q.onsuccess=function(){var tx=q.result.transaction("h",mode),r=fn(tx.objectStore("h"));tx.oncomplete=function(){res(r&&r.result)};tx.onerror=function(){rej(tx.error)}}})}
+async function saveExcel(A){
+ var wb=buildWb(A);if(!wb)return "Excel library could not load, so the Excel file was not updated.";
+ var data=XLSX.write(wb,{type:"array",bookType:"xlsx"});
+ if(window.showSaveFilePicker){
+  try{
+   var h=XH;if(!h){try{h=XH=await idb("readonly",function(st){return st.get("file")})}catch(e){}}
+   if(h){var pm=await h.queryPermission({mode:"readwrite"});if(pm!="granted")pm=await h.requestPermission({mode:"readwrite"});if(pm!="granted")h=null}
+   if(!h){h=await window.showSaveFilePicker({suggestedName:"appointments.xlsx",types:[{description:"Excel workbook",accept:{"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":[".xlsx"]}}]});XH=h;try{await idb("readwrite",function(st){return st.put(h,"file")})}catch(e){}}
+   var w=await h.createWritable();await w.write(data);await w.close();return "Saved to Excel file: "+h.name;
+  }catch(e){}
+ }
+ XLSX.writeFile(wb,"appointments.xlsx");return "Excel file downloaded (appointments.xlsx).";
+}
+/* database (Supabase) */
+var SB=window.SB_CONFIG||{},SK="sb_session";
+function dbOn(){return !!(SB.url&&SB.key)}
+function sess(){try{return JSON.parse(localStorage.getItem(SK))}catch(e){return null}}
+function setSess(s){try{if(s)localStorage.setItem(SK,JSON.stringify(s));else localStorage.removeItem(SK)}catch(e){}}
+function jwt(t){try{return JSON.parse(atob(t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")))}catch(e){return{}}}
+function mkSess(j){var p=jwt(j.access_token);return{at:j.access_token,rt:j.refresh_token,exp:(p.exp||0)*1000,email:p.email||"",role:(p.app_metadata||{}).role||""}}
+function dbAuth(grant,body){return fetch(SB.url+"/auth/v1/token?grant_type="+grant,{method:"POST",headers:{apikey:SB.key,"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error_description||j.msg||"Sign-in failed");return j})})}
+function dbLogin(email,pw){return dbAuth("password",{email:email,password:pw}).then(function(j){var s=mkSess(j);if(["admin","staff"].indexOf(s.role)<0)throw new Error("This account has no access. Ask the admin to assign it a role.");setSess(s);return s})}
+function dbToken(){var s=sess();if(!s)return Promise.reject(new Error("Please sign in."));if(Date.now()<s.exp-60000)return Promise.resolve(s.at);return dbAuth("refresh_token",{refresh_token:s.rt}).then(function(j){var n=mkSess(j);setSess(n);return n.at},function(){setSess(null);throw new Error("Session expired. Please sign in again.")})}
+function dbReq(method,path,body,extra){return dbToken().then(function(t){var h={apikey:SB.key,Authorization:"Bearer "+t,"Content-Type":"application/json"};for(var k in extra||{})h[k]=extra[k];return fetch(SB.url+"/rest/v1/"+path,{method:method,headers:h,body:body?JSON.stringify(body):undefined})}).then(function(r){
+ if(r.ok)return r.text().then(function(x){return x?JSON.parse(x):[]});
+ return r.json().catch(function(){return{}}).then(function(j){var e=new Error(j.message||("Database error "+r.status));e.code=j.code;e.status=r.status;throw e})})}
+function dbPull(){var all=[];function pg(i){return dbReq("GET","appointments?select=*&order=date.asc,time.asc",null,{Range:i+"-"+(i+999),"Range-Unit":"items"}).then(function(rows){all=all.concat(rows);return rows.length==1000?pg(i+1000):all})}return pg(0)}
+function dbRow(a){return{id:Number(a.id),date:a.date,time:a.time,name:a.name,phone:String(a.phone||""),svc:a.svc,reason:a.reason,status:a.status||"Scheduled",created:a.created||new Date().toISOString(),updated:new Date().toISOString()}}
+function dbSave(items){return dbReq("POST","appointments?on_conflict=id",items.map(dbRow),{Prefer:"resolution=merge-duplicates,return=minimal"})}
+function dbDel(id){return dbReq("DELETE","appointments?id=eq."+encodeURIComponent(id))}
+function dbClear(){return dbReq("DELETE","appointments?id=gt.0")}
+function dbCfgGet(){return dbReq("GET","settings?id=eq.1&select=data").then(function(r){return r[0]?r[0].data:null})}
+function dbCfgSet(d){return dbReq("POST","settings?on_conflict=id",[{id:1,data:d}],{Prefer:"resolution=merge-duplicates,return=minimal"})}
+var booted=false;
+function refresh(){fillTimes();renderCal()}
+function pull(){return dbPull().then(function(rows){if(!rows.length&&load().length){xMsg("The database is empty. Upload existing data from Admin → Settings → Data.");return}store(rows);refresh();xMsg("")}).catch(function(e){xMsg("Database: "+e.message);if(!sess())gate()})}
+function who(){var s=sess();if(!s)return;$("who").innerHTML="Signed in as "+esc(s.email)+" · <a href=\"#\" id=\"lo\">Log out</a>";$("lo").onclick=function(e){e.preventDefault();setSess(null);location.reload()}}
+function boot(){if(booted)return;booted=true;
+ dbCfgGet().then(function(d){if(!d)return;var s=JSON.stringify(d);if(localStorage.getItem("clinic_cfg_db")===s)return;
+  var old={};try{old=JSON.parse(localStorage.getItem("clinic_config_v1"))||{}}catch(e){}var n=Object.assign({},d);if(old.ps){n.ps=old.ps;n.ph=old.ph}
+  try{localStorage.setItem("clinic_config_v1",JSON.stringify(n));localStorage.setItem("clinic_cfg_db",s);location.reload()}catch(e){}}).catch(function(){});
+ pull();setInterval(function(){if(!document.hidden)pull()},30000)}
+function gate(){if(!dbOn())return;if(sess()){$("lock").style.display="none";who();boot()}else $("lock").style.display="flex"}
+$("lgo").onclick=function(){$("lerr").textContent="";dbLogin($("le1").value.trim(),$("lp").value).then(function(){$("lp").value="";gate()}).catch(function(e){$("lerr").textContent=e.message})};
+$("lp").onkeydown=function(e){if(e.key=="Enter")$("lgo").click()};
+applyCfg();$("date").value=sel;$("date").min=iso(today);fillTimes();renderCal();setInterval(fillTimes,60000);gate();
+</script>
+</body>
+</html>
