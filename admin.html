@@ -28,6 +28,7 @@ label{display:block;font-size:.8rem;color:var(--mut)}label input,label select{ma
 .bar .t{flex:1;background:var(--soft);border-radius:5px}.bar i{display:block;height:10px;background:var(--pri);border-radius:5px;min-width:3px}
 .wrap{overflow-x:auto;max-height:560px}table{width:100%;border-collapse:collapse;font-size:.85rem}
 th,td{padding:7px 8px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}th{color:var(--mut);position:sticky;top:0;background:var(--card)}
+.rt{text-align:right;white-space:nowrap}
 .li{display:flex;gap:6px;margin-bottom:6px}.ck{display:inline-block;margin:0 12px 6px 0;color:var(--tx);font-size:.9rem}
 .logo{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap}.logo img{height:48px;border-radius:8px;border:1px solid var(--bd)}
 .lg{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}.lg .card{max-width:340px;width:100%}
@@ -41,7 +42,7 @@ th,td{padding:7px 8px;border-bottom:1px solid var(--bd);text-align:left;vertical
 <body>
 <div id="login" class="lg"><div class="card"><h3 id="lt">Admin Login</h3><input id="em" type="email" placeholder="Email" autocomplete="username" style="margin-bottom:8px" hidden><input id="pw" type="password" placeholder="Password" autocomplete="current-password"><input id="pw2" type="password" placeholder="Confirm password" autocomplete="new-password" style="margin-top:8px" hidden><button class="pri" id="go" style="width:100%;margin-top:10px">Login</button><div class="err" id="le"></div></div></div>
 <div id="app" hidden>
-<div class="top np"><h1 id="ttl">Admin Panel</h1><nav><button data-t="rep" class="on">Reports &amp; Appointments</button><button data-t="set">Settings</button><button id="out">Logout</button></nav></div>
+<div class="top np"><h1 id="ttl">Admin Panel</h1><nav><button data-t="rep" class="on">Reports &amp; Appointments</button><button data-t="sal">Sales</button><button data-t="set">Settings</button><button id="out">Logout</button></nav></div>
 <main>
 <section id="rep">
 <div class="card np"><div class="row">
@@ -52,6 +53,13 @@ th,td{padding:7px 8px;border-bottom:1px solid var(--bd);text-align:left;vertical
 <div class="cards" id="cards"></div>
 <div class="g2" id="bars"></div>
 <div class="card"><h3>Appointment details</h3><div class="wrap"><table><thead><tr><th>#</th><th>Date</th><th>Time</th><th>Patient</th><th>Phone</th><th>Service</th><th>Reason</th><th>Status</th><th>Booked on</th><th class="np"></th></tr></thead><tbody id="tb"></tbody></table></div></div>
+</section>
+<section id="sal" hidden>
+<div class="card np"><div class="row"><label>From<input type="date" id="sf"></label><label>To<input type="date" id="st"></label><label>Item<select id="si"></select></label><label>Patient<input id="sq" placeholder="Name or phone"></label></div>
+<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button id="sxl" class="pri">⬇ Export Excel</button><button id="sprt">Print report</button><button id="sclr">Clear filters</button><span class="mut" id="smsg" style="align-self:center"></span></div></div>
+<div class="cards" id="scards"></div><div class="g2" id="sbars"></div>
+<div class="card"><h3>Upcoming follow-ups</h3><div id="sfu"></div></div>
+<div class="card"><h3>Bills</h3><div class="wrap"><table><thead><tr><th>Invoice</th><th>Date</th><th>Patient</th><th>Phone</th><th>Service</th><th>Items</th><th>Total</th><th>Next visit</th><th class="np"></th></tr></thead><tbody id="sb"></tbody></table></div></div>
 </section>
 <section id="set" hidden></section>
 </main></div>
@@ -64,7 +72,7 @@ L:{formTitle:"New Appointment",editTitle:"Edit Appointment",book:"Book Appointme
 P:{name:"Patient’s full name",phone:"e.g. 0300 1234567",reason:"Briefly describe the reason for the visit"},
 services:["Physiotherapy","Speech Therapy","Occupational Therapy","Psychological Counseling","Behavioral Therapy"],
 statuses:["Scheduled","Completed","Cancelled","No-show"],start:"10:00",end:"18:00",step:30,closed:[],
-wa:"Dear {name},\n\nYour appointment at {clinic} has been confirmed.\n\nService: {service}\nDate: {date}\nTime: {time}\nReason: {reason}\n\nPlease arrive 10 minutes before your scheduled time. If you need to reschedule, kindly contact us in advance.\n\nThank you,\n{clinic}"};
+wa:"Dear {name},\n\nYour appointment at {clinic} has been confirmed.\n\nService: {service}\nDate: {date}\nTime: {time}\nReason: {reason}\n\nPlease arrive 10 minutes before your scheduled time. If you need to reschedule, kindly contact us in advance.\n\nThank you,\n{clinic}",patch:"Patches",cur:"Rs",items:[{n:"Consultation",p:1500},{n:"Therapy Session",p:2500},{n:"Follow-up Visit",p:1000},{n:"Medicine / Supplies",p:500}],waf:"Dear {name},\n\nThis is a friendly reminder of your next visit at {clinic} on {date}.\n\nService: {service}\n\nIf you need to reschedule, please contact us in advance.\n\nThank you,\n{clinic}"};
 var LN={formTitle:"Form heading (new)",editTitle:"Form heading (edit)",book:"Book button",update:"Update button",name:"Name field label",phone:"Phone field label",svc:"Service field label",date:"Date field label",time:"Time field label",reason:"Reason field label",allTitle:"All-appointments heading"};
 var PN={name:"Name placeholder",phone:"Phone placeholder",reason:"Reason placeholder"};
 function $(i){return document.getElementById(i)}
@@ -116,12 +124,59 @@ function dbRow(a){return{id:Number(a.id),date:a.date,time:a.time,name:a.name,pho
 function dbSave(items){return dbReq("POST","appointments?on_conflict=id",items.map(dbRow),{Prefer:"resolution=merge-duplicates,return=minimal"})}
 function dbDel(id){return dbReq("DELETE","appointments?id=eq."+encodeURIComponent(id))}
 function dbClear(){return dbReq("DELETE","appointments?id=gt.0")}
+function fm(n){return (C.cur||"")+" "+(Math.round((+n||0)*100)/100).toLocaleString()}
+function calc(items){var sub=0;items.forEach(function(x){sub+=x.p*x.q});sub=Math.round(sub*100)/100;return{sub:sub,total:sub}}
+function dbPullT(t,ord){var all=[];function pg(i){return dbReq("GET",t+"?select=*&order="+ord,null,{Range:i+"-"+(i+999),"Range-Unit":"items"}).then(function(r){all=all.concat(r);return r.length==1000?pg(i+1000):all})}return pg(0)}
+function billSave(b){return dbReq("POST","bills?on_conflict=id",[b],{Prefer:"resolution=merge-duplicates,return=minimal"})}
+function billDel(id){return dbReq("DELETE","bills?id=eq."+encodeURIComponent(id))}
+function printBill(b){var w=window.open("","_blank");if(!w)return false;
+ var r=b.items.map(function(x,i){return "<tr><td>"+(i+1)+"</td><td>"+esc(x.n)+"</td><td class=r>"+fm(x.p)+"</td><td class=r>"+x.q+"</td><td class=r>"+fm(x.p*x.q)+"</td></tr>"}).join("");
+ w.document.write("<!doctype html><html><head><meta charset=utf-8><title>Invoice</title><style>body{font-family:Arial,sans-serif;max-width:720px;margin:24px auto;color:#111;padding:0 16px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #ccc;padding:8px;text-align:left}.r{text-align:right}.t td{border:0;padding:4px 8px}h1{margin:0 0 4px}.m{color:#555}</style></head><body>"
+ +(C.logo?"<img src=\""+esc(C.logo)+"\" style=\"height:52px\"><br>":"")+"<h1>"+esc(C.clinic)+"</h1><div class=m>Invoice INV-"+String(b.id).slice(-8)+" · "+esc(b.bill_date)+"</div><hr>"
+ +"<p><b>"+esc(b.name)+"</b><br>"+esc(b.phone)+"<br>"+esc(b.svc)+"</p>"
+ +"<table><tr><th>Sr No</th><th>Item</th><th class=r>Price</th><th class=r>Qty</th><th class=r>Total</th></tr>"+r+"</table>"
+ +"<table class=t>"+(b.discount?"<tr><td class=r>Subtotal</td><td class=r>"+fm(b.subtotal)+"</td></tr><tr><td class=r>Discount"+(b.disc_type=="pct"?" ("+b.disc_value+"%)":"")+"</td><td class=r>- "+fm(b.discount)+"</td></tr>":"")+"<tr><td class=r><b>Total</b></td><td class=r><b>"+fm(b.total)+"</b></td></tr></table>"
+ +(b.next_visit?"<p><b>Next visit:</b> "+esc(b.next_visit)+"</p>":"")+"</body></html>");
+ w.document.close();w.focus();setTimeout(function(){w.print()},300);return true}
 function dbCfgGet(){return dbReq("GET","settings?id=eq.1&select=data").then(function(r){return r[0]?r[0].data:null})}
 function dbCfgSet(d){return dbReq("POST","settings?on_conflict=id",[{id:1,data:d}],{Prefer:"resolution=merge-duplicates,return=minimal"})}
 function refresh(){rep();fillFilters()}
-function pullA(){return dbPull().then(function(rows){if(!rows.length&&jget(KA,[]).length){toast("The database is empty. Use “Upload local data to database” in Settings → Data.");return}jset(KA,rows);refresh()}).catch(function(e){toast("Database: "+e.message)})}
+function pullA(){pullBills();return dbPull().then(function(rows){if(!rows.length&&jget(KA,[]).length){toast("The database is empty. Use “Upload local data to database” in Settings → Data.");return}jset(KA,rows);refresh()}).catch(function(e){toast("Database: "+e.message)})}
 function cfgFromDb(){return dbCfgGet().then(function(d){if(!d)return;var old=jget(KC,{}),n=Object.assign({},d);if(old.ps){n.ps=old.ps;n.ph=old.ph}jset(KC,n);try{localStorage.setItem("clinic_cfg_db",JSON.stringify(d))}catch(e){}C=cfg();D=cfg();$("ttl").textContent=C.clinic+" – Admin";fillFilters();setUI();rep()}).catch(function(){})}
 function dbBoot(){if(!dbOn())return;cfgFromDb();pullA();setInterval(function(){if(tab=="rep"&&!document.hidden)pullA()},30000)}
+/* sales */
+var KB="clinic_bills_v1";
+function salMsg(t){var e=$("smsg");if(e)e.textContent=t}
+function pullBills(){if(!dbOn())return;dbPullT("bills","created.desc").then(function(b){jset(KB,b);salMsg("");if(tab=="sal")sal()},function(e){salMsg("Bills could not be loaded: "+e.message+" (run supabase-setup.sql again in Supabase).")})}
+function billCard(){return '<div class="card"><h3>Billing &amp; invoice</h3><div class="row">'+fld("Currency symbol","cur",0,D.cur)+fld("Button label (shown next to Cancel)","patch",0,D.patch)+'</div><h3 style="margin-top:14px">Items &amp; prices</h3>'+D.items.map(function(x,i){return '<div class="li"><input data-it="n" data-i="'+i+'" value="'+esc(x.n)+'" placeholder="Item name"><input data-it="p" data-i="'+i+'" type="number" min="0" step="any" value="'+esc(x.p)+'" placeholder="Price" style="max-width:130px"><button class="del" data-rmit="'+i+'">✕</button></div>'}).join("")+'<button data-addit="1">+ Add item</button></div>'}
+function billsF(){var f=$("sf").value,t=$("st").value,it=$("si").value,q=$("sq").value.toLowerCase();
+ return jget(KB,[]).filter(function(b){return (!f||b.bill_date>=f)&&(!t||b.bill_date<=t)&&(!it||b.items.some(function(x){return x.n==it}))&&(!q||(b.name+" "+b.phone).toLowerCase().indexOf(q)>-1)}).sort(function(a,b){return a.created<b.created?1:-1})}
+function sumg(A,kf,vf){var m={};A.forEach(function(a){var k=kf(a);m[k]=(m[k]||0)+vf(a)});return m}
+function topN(m,n){var o={};Object.keys(m).sort(function(a,b){return m[b]-m[a]}).slice(0,n).forEach(function(k){o[k]=m[k]});return o}
+function allItems(){var s=C.items.map(function(x){return x.n});jget(KB,[]).forEach(function(b){b.items.forEach(function(x){if(s.indexOf(x.n)<0)s.push(x.n)})});return s}
+function sal(){var B=billsF(),all=jget(KB,[]),n=new Date(),td=n.getFullYear()+"-"+pad(n.getMonth()+1)+"-"+pad(n.getDate()),mo=td.slice(0,7),R=function(x){return Math.round(x*100)/100};
+ var g=0,d=0,t=0,q=0,tdS=0,moS=0;B.forEach(function(b){t+=b.total;b.items.forEach(function(x){q+=x.q})});
+ all.forEach(function(b){if(b.bill_date==td)tdS+=b.total;if(b.bill_date.slice(0,7)==mo)moS+=b.total});
+ var si=$("si").value;$("si").innerHTML=opts(allItems(),"All items");$("si").value=si;
+ $("scards").innerHTML=kc("Bills",B.length)+kc("Total sales",fm(t))+kc("Average bill",fm(B.length?t/B.length:0))+kc("Items sold",R(q))+kc("Today’s sales",fm(tdS))+kc("This month",fm(moS));
+ var im={},iq={};B.forEach(function(b){b.items.forEach(function(x){im[x.n]=(im[x.n]||0)+x.p*x.q;iq[x.n]=(iq[x.n]||0)+x.q})});
+ $("sbars").innerHTML=bars("Revenue by item",im,0,0,fm)+bars("Quantity sold by item",iq)+bars("Net sales by month",sumg(B,function(b){return b.bill_date.slice(0,7)},function(b){return b.total}),1,0,fm)+bars("Net sales by service",sumg(B,function(b){return b.svc||"—"},function(b){return b.total}),0,0,fm)+bars("Top patients by spend",topN(sumg(B,function(b){return b.name+" ("+b.phone+")"},function(b){return b.total}),8),0,0,fm);
+ var seen={},fu=all.slice().sort(function(a,b){return a.created<b.created?1:-1}).filter(function(b){var k=b.appt_id||("b"+b.id);if(seen[k])return false;seen[k]=1;return b.next_visit&&b.next_visit>=td}).sort(function(a,b){return a.next_visit<b.next_visit?-1:1}).slice(0,15);
+ $("sfu").innerHTML=fu.length?fu.map(function(b){return '<div class="bar"><span style="width:110px">'+esc(b.next_visit)+'</span><span style="flex:1">'+esc(b.name)+' · '+esc(b.phone)+'</span></div>'}).join(""):'<p class="mut">No upcoming follow-ups.</p>';
+ $("sb").innerHTML=B.length?B.map(function(b){return '<tr><td>INV-'+String(b.id).slice(-8)+'</td><td>'+esc(b.bill_date)+'</td><td>'+esc(b.name)+'</td><td>'+esc(b.phone)+'</td><td>'+esc(b.svc)+'</td><td>'+b.items.map(function(x){return esc(x.n)+' ×'+x.q}).join(', ')+'</td><td class="rt"><b>'+fm(b.total)+'</b></td><td>'+esc(b.next_visit||"—")+'</td><td class="np"><button data-pr="'+b.id+'">Print</button> <button class="del" data-bd="'+b.id+'">Delete</button></td></tr>'}).join(""):'<tr><td colspan="9" class="mut">No bills match the filters.</td></tr>'}
+["sf","st","si","sq"].forEach(function(i){$(i).oninput=sal});
+$("sclr").onclick=function(){["sf","st","si","sq"].forEach(function(i){$(i).value=""});sal()};
+$("sprt").onclick=function(){window.print()};
+$("sb").onclick=function(e){var p=e.target.closest("[data-pr]"),d=e.target.closest("[data-bd]");
+ if(p){var b=jget(KB,[]).filter(function(x){return String(x.id)==p.dataset.pr})[0];if(b&&!printBill(b))toast("Please allow pop-ups to print the invoice.")}
+ else if(d&&confirm("Delete this bill permanently?")){(dbOn()?billDel(d.dataset.bd):Promise.resolve()).then(function(){jset(KB,jget(KB,[]).filter(function(x){return String(x.id)!=d.dataset.bd}));sal()},function(x){toast("Database error: "+x.message)})}};
+$("sxl").onclick=function(){if(!window.XLSX)return toast("Excel library could not load. Please check your internet connection.");var B=billsF(),im={},mm={};
+ B.forEach(function(b){b.items.forEach(function(x){var o=im[x.n]||(im[x.n]={q:0,r:0});o.q+=x.q;o.r+=x.p*x.q});var k=b.bill_date.slice(0,7),m=mm[k]||(mm[k]={n:0,t:0});m.n++;m.t+=b.total});
+ var wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(B.map(function(b){return{"Invoice":"INV-"+String(b.id).slice(-8),"Date":b.bill_date,"Patient":b.name,"Phone":String(b.phone),"Service":b.svc,"Items":b.items.map(function(x){return x.n+" x"+x.q+" @"+x.p}).join(", "),"Total":b.total,"Next Visit":b.next_visit}})),"Bills");
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(Object.keys(im).map(function(k){return{"Item":k,"Qty sold":im[k].q,"Revenue":im[k].r}})),"Items");
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(Object.keys(mm).sort().map(function(k){return{"Month":k,"Bills":mm[k].n,"Total sales":mm[k].t}})),"Monthly");
+ XLSX.writeFile(wb,"sales-report.xlsx");toast("Sales report downloaded.")};
 /* login */
 function ok(){try{return sessionStorage.getItem("adm")=="1"}catch(e){return false}}
 function show(){$("login").hidden=true;$("app").hidden=false;$("ttl").textContent=C.clinic+" – Admin";fillFilters();rep();setUI();dbBoot()}
@@ -134,7 +189,7 @@ $("go").onclick=function(){var v=$("pw").value;
  else if(hp(C.ps+v)===C.ph)enter();else $("le").textContent="Incorrect password."};
 $("pw").onkeydown=function(e){if(e.key=="Enter")$("go").click()};
 $("out").onclick=function(){try{sessionStorage.removeItem("adm")}catch(e){}setSess(null);location.reload()};
-document.querySelectorAll("[data-t]").forEach(function(b){b.onclick=function(){tab=b.dataset.t;$("rep").hidden=tab!="rep";$("set").hidden=tab!="set";document.querySelectorAll("[data-t]").forEach(function(x){x.classList.toggle("on",x==b)});if(tab=="rep")rep();else setUI()}});
+document.querySelectorAll("[data-t]").forEach(function(b){b.onclick=function(){tab=b.dataset.t;$("rep").hidden=tab!="rep";$("sal").hidden=tab!="sal";$("set").hidden=tab!="set";document.querySelectorAll("[data-t]").forEach(function(x){x.classList.toggle("on",x==b)});if(tab=="rep")rep();else if(tab=="sal")sal();else setUI()}});
 
 /* reports */
 function services(){var s=C.services.slice();jget(KA,[]).forEach(function(a){if(s.indexOf(a.svc)<0)s.push(a.svc)});return s}
@@ -143,8 +198,8 @@ function fillFilters(){var s=$("fs").value,t=$("ft").value;$("fs").innerHTML=opt
 function filtered(){var f=$("ff").value,t=$("fto").value,s=$("fs").value,st=$("ft").value,q=$("fq").value.toLowerCase();
 return jget(KA,[]).filter(function(a){var S=a.status||"Scheduled";return (!f||a.date>=f)&&(!t||a.date<=t)&&(!s||a.svc==s)&&(!st||S==st)&&(!q||(a.name+" "+a.phone+" "+a.reason).toLowerCase().indexOf(q)>-1)}).sort(function(a,b){return (a.date+a.time)<(b.date+b.time)?-1:1})}
 function grp(A,fn){var m={};A.forEach(function(a){var k=fn(a);m[k]=(m[k]||0)+1});return m}
-function bars(title,m,asc,lb){var k=Object.keys(m);k.sort(asc?function(a,b){return a<b?-1:1}:function(a,b){return m[b]-m[a]});var mx=Math.max.apply(null,k.map(function(x){return m[x]}).concat([1]));
-return '<div class="card"><h3>'+title+'</h3>'+(k.length?k.map(function(x){return '<div class="bar"><span>'+esc(lb?lb(x):x)+'</span><span class="t"><i style="width:'+m[x]/mx*100+'%"></i></span><b>'+m[x]+'</b></div>'}).join(""):'<p class="mut">No data</p>')+'</div>'}
+function bars(title,m,asc,lb,f){var k=Object.keys(m);k.sort(asc?function(a,b){return a<b?-1:1}:function(a,b){return m[b]-m[a]});var mx=Math.max.apply(null,k.map(function(x){return m[x]}).concat([1]));
+return '<div class="card"><h3>'+title+'</h3>'+(k.length?k.map(function(x){return '<div class="bar"><span>'+esc(lb?lb(x):x)+'</span><span class="t"><i style="width:'+m[x]/mx*100+'%"></i></span><b>'+(f?f(m[x]):m[x])+'</b></div>'}).join(""):'<p class="mut">No data</p>')+'</div>'}
 function kc(l,v){return '<div class="k"><b>'+v+'</b><span>'+esc(l)+'</span></div>'}
 function rep(){var A=filtered(),n=new Date(),td=n.getFullYear()+"-"+pad(n.getMonth()+1)+"-"+pad(n.getDate());
 var S=function(a){return a.status||"Scheduled"},st=grp(A,S);
@@ -174,27 +229,28 @@ $("set").innerHTML='<div class="card"><h3>Branding</h3><div class="row">'+fld("C
 +'<div class="g2">'+lst("services","Therapy services (dropdown items)")+lst("statuses","Appointment statuses")+'</div><p class="mut">“Scheduled” and “Cancelled” are used by the booking page and are kept automatically. Renaming an item does not change appointments that already use the old name.</p>'
 +'<div class="card"><h3>Schedule</h3><div class="row">'+fld("Opening time","start","time",D.start)+fld("Closing time","end","time",D.end)+'<label>Slot length (minutes)<select data-p="step">'+[15,20,30,45,60].map(function(m){return '<option'+(m==D.step?" selected":"")+'>'+m+'</option>'}).join("")+'</select></label></div><p class="mut">Closed days:</p>'+DN.map(function(n,i){return '<label class="ck"><input type="checkbox" data-day="'+i+'"'+(D.closed.indexOf(i)>-1?" checked":"")+'> '+n+'</label>'}).join("")+'</div>'
 
-+'<div class="card"><h3>WhatsApp message</h3><p class="mut">Placeholders: {name} {service} {date} {time} {reason} {phone} {clinic}</p><textarea data-p="wa" rows="10">'+esc(D.wa)+'</textarea></div>'
++billCard()
++'<div class="card"><h3>WhatsApp message</h3><p class="mut">Placeholders: {name} {service} {date} {time} {reason} {phone} {clinic}</p><textarea data-p="wa" rows="10">'+esc(D.wa)+'</textarea><h3 style="margin-top:14px">Follow-up reminder message</h3><p class="mut">Used by the WhatsApp button in Upcoming Follow-ups. Placeholders: {name} {service} {date} {phone} {clinic}</p><textarea data-p="waf" rows="7">'+esc(D.waf)+'</textarea></div>'
 +(dbOn()?'<div class="card"><h3>Security</h3><p class="mut">Sign-in is handled by the database (Supabase Authentication). Add or remove staff accounts in your Supabase dashboard.</p></div>':'<div class="card"><h3>Security</h3><div class="row"><label>New password<input type="password" id="npw" autocomplete="new-password"></label><label>Confirm new password<input type="password" id="npw2" autocomplete="new-password"></label></div><p class="mut">Leave blank to keep the current password. It is stored only as a salted hash, never as readable text. This is still a basic on-page lock, not server-level security.</p></div>')
 +'<div class="card"><h3>Data</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><button data-x="xl" class="pri">Download all as Excel</button><label class="fl">Import from Excel<input type="file" id="xf" accept=".xlsx,.xls" hidden></label><button data-x="bk">Download backup</button><label class="fl">Restore backup<input type="file" id="rf" accept=".json" hidden></label><button class="del" data-x="da">Delete all appointments</button><button class="del" data-x="rs">Reset settings</button>'+(dbOn()?'<button data-x="up">Upload local data to database</button><button data-x="dn">Fetch from database</button>':'')+'</div></div>'
 +'<button class="pri" data-x="sv" style="font-size:1rem;padding:12px 28px">Save Settings</button>'}
-$("set").addEventListener("input",function(e){var t=e.target;if(t.dataset.p){setp(t.dataset.p,t.dataset.p=="step"?+t.value:t.value)}else if(t.dataset.l){D[t.dataset.l][+t.dataset.i]=t.value}else if(t.dataset.day!=null){var d=+t.dataset.day,i=D.closed.indexOf(d);if(t.checked&&i<0)D.closed.push(d);if(!t.checked&&i>-1)D.closed.splice(i,1)}});
+$("set").addEventListener("input",function(e){var t=e.target;if(t.dataset.p){setp(t.dataset.p,t.dataset.p=="step"?+t.value:t.value)}else if(t.dataset.l){D[t.dataset.l][+t.dataset.i]=t.value}else if(t.dataset.it){D.items[+t.dataset.i][t.dataset.it]=t.dataset.it=="p"?+t.value:t.value}else if(t.dataset.day!=null){var d=+t.dataset.day,i=D.closed.indexOf(d);if(t.checked&&i<0)D.closed.push(d);if(!t.checked&&i>-1)D.closed.splice(i,1)}});
 $("set").addEventListener("change",function(e){var f=e.target.files&&e.target.files[0];if(!f)return;
 if(e.target.id=="lg"){var r=new FileReader();r.onload=function(){var im=new Image();im.onload=function(){var s=Math.min(1,160/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=im.width*s;c.height=im.height*s;c.getContext("2d").drawImage(im,0,0,c.width,c.height);D.logo=c.toDataURL("image/png");setUI()};im.src=r.result};r.readAsDataURL(f)}
 if(e.target.id=="xf"){importXlsx(f);e.target.value=""}
-if(e.target.id=="rf"){var r2=new FileReader();r2.onload=function(){try{var j=JSON.parse(r2.result);if(j.config)jset(KC,j.config);if(j.appointments)jset(KA,j.appointments);if(dbOn()){var cc=Object.assign({},j.config||{});delete cc.ps;delete cc.ph;delete cc.pass;Promise.all([j.appointments?dbSave(j.appointments):0,j.config?dbCfgSet(cc):0]).then(function(){location.reload()},function(x){toast("Database error: "+x.message)})}else location.reload()}catch(x){toast("Invalid backup file.")}};r2.readAsText(f)}});
+if(e.target.id=="rf"){var r2=new FileReader();r2.onload=function(){try{var j=JSON.parse(r2.result);if(j.config)jset(KC,j.config);if(j.appointments)jset(KA,j.appointments);if(j.bills)jset(KB,j.bills);if(dbOn()){var cc=Object.assign({},j.config||{});delete cc.ps;delete cc.ph;delete cc.pass;Promise.all([j.appointments?dbSave(j.appointments):0,j.config?dbCfgSet(cc):0,j.bills&&j.bills.length?dbReq("POST","bills?on_conflict=id",j.bills,{Prefer:"resolution=merge-duplicates,return=minimal"}):0]).then(function(){location.reload()},function(x){toast("Database error: "+x.message)})}else location.reload()}catch(x){toast("Invalid backup file.")}};r2.readAsText(f)}});
 $("set").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;
 if(b.dataset.add){D[b.dataset.add].push("");setUI()}
-else if(b.dataset.rm2){D[b.dataset.rm2].splice(+b.dataset.i,1);setUI()}
+else if(b.dataset.rm2){D[b.dataset.rm2].splice(+b.dataset.i,1);setUI()}else if(b.dataset.addit){D.items.push({n:"",p:0});setUI()}else if(b.dataset.rmit!=null){D.items.splice(+b.dataset.rmit,1);setUI()}
 else if(b.dataset.x=="logo"){D.logo="";setUI()}
 else if(b.dataset.x=="sv")save();
 else if(b.dataset.x=="xl")exportXlsx(jget(KA,[]),"all-appointments.xlsx");
-else if(b.dataset.x=="bk")dl("clinic-backup.json","application/json",JSON.stringify({config:cfg(),appointments:jget(KA,[])},null,1));
+else if(b.dataset.x=="bk")dl("clinic-backup.json","application/json",JSON.stringify({config:cfg(),appointments:jget(KA,[]),bills:jget(KB,[])},null,1));
 else if(b.dataset.x=="up"){dbSave(jget(KA,[])).then(function(){toast("Uploaded "+jget(KA,[]).length+" appointments to the database.")},function(x){toast("Database error: "+x.message)})}
 else if(b.dataset.x=="dn")pullA();
 else if(b.dataset.x=="da"){if(confirm("Delete ALL appointments? This cannot be undone.")){(dbOn()?dbClear():Promise.resolve()).then(function(){jset(KA,[]);rep();toast("All appointments deleted")},function(x){toast("Database error: "+x.message)})}}
 else if(b.dataset.x=="rs"){if(confirm("Reset all settings to default?")){var fin=function(){try{localStorage.removeItem(KC)}catch(x){}location.reload()};if(dbOn()){var dv=JSON.parse(JSON.stringify(DEF));delete dv.ps;delete dv.ph;delete dv.pass;dbCfgSet(dv).then(fin,function(x){toast("Database error: "+x.message)})}else fin()}}});
-function save(){var np=$("npw")?$("npw").value:"";if(np){if(np.length<6)return toast("New password must be at least 6 characters.");if(np!==$("npw2").value)return toast("New passwords do not match.");setPw(D,np)}delete D.pass;var tr=function(a){return a.map(function(x){return x.trim()}).filter(Boolean)};D.services=tr(D.services);D.statuses=tr(D.statuses);
+function save(){var np=$("npw")?$("npw").value:"";if(np){if(np.length<6)return toast("New password must be at least 6 characters.");if(np!==$("npw2").value)return toast("New passwords do not match.");setPw(D,np)}delete D.pass;var tr=function(a){return a.map(function(x){return x.trim()}).filter(Boolean)};D.services=tr(D.services);D.statuses=tr(D.statuses);D.items=(D.items||[]).filter(function(x){return String(x.n).trim()}).map(function(x){return{n:String(x.n).trim(),p:+x.p||0}});
 if(!D.services.length)return toast("Add at least one therapy service.");
 ["Scheduled","Cancelled"].forEach(function(s){if(D.statuses.indexOf(s)<0)D.statuses.push(s)});
 if(toM(D.end)<=toM(D.start))return toast("Closing time must be after opening time.");
