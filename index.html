@@ -40,6 +40,8 @@ button{font:inherit;cursor:pointer;border:0;border-radius:9px;padding:11px 14px}
 .acts{display:flex;gap:6px}.acts button,.acts a{padding:6px 10px;font-size:.8rem;border-radius:7px}
 .del{background:transparent;color:var(--dng);border:1px solid var(--dng)}
 .acts a.wa{padding:6px 10px}.edit{background:var(--soft);color:var(--tx)}.full{grid-column:1/-1}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}.ov.open{display:flex}.bill{background:var(--pri);color:var(--pri-tx)}#btbl{width:100%;border-collapse:collapse;font-size:.85rem}#btbl th,#btbl td{padding:4px;text-align:left}#btbl input{padding:6px}.rt{white-space:nowrap}
+.dd{margin-top:12px}.dd>summary{cursor:pointer;font-weight:600;font-size:1.05rem}.dd[open]>summary{margin-bottom:10px}.mt{color:var(--mut)}
 .bd{font-style:normal;font-size:.7rem;background:var(--soft);border-radius:8px;padding:1px 8px;margin-left:6px}
 #modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
 #modal.open{display:flex}
@@ -74,13 +76,31 @@ button{font:inherit;cursor:pointer;border:0;border-radius:9px;padding:11px 14px}
 <section class="card">
   <div class="nav"><button id="prev" aria-label="Previous month">‹</button><h2 id="mt" style="margin:0"></h2><button id="next" aria-label="Next month">›</button></div>
   <div class="grid" id="cal"></div>
-  <h2 id="dt" style="margin-top:18px"></h2>
-  <div id="list"></div>
 </section>
-<section class="card full"><h2 id="ah">All Appointments</h2>
-<div style="margin-bottom:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="ghost" id="xls">⬇ Download Excel</button><span id="gst" style="color:var(--mut);font-size:.85rem"></span></div><div id="all"></div></section>
+<section class="full">
+<div class="card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="pri" id="newbill" style="width:auto;margin:0">🧾 Create Bill</button><button class="ghost" id="xls">⬇ Download Excel</button><span id="gst" style="color:var(--mut);font-size:.85rem"></span></div>
+<details class="card dd" open><summary id="th">Today’s Appointments</summary><div id="tdl"></div></details>
+<details class="card dd"><summary id="fh">Upcoming Follow-ups</summary><div id="ful"></div></details>
+<details class="card dd"><summary id="ah">All Appointments</summary><div id="all"></div></details>
+</section>
 </main>
 
+<datalist id="bitems"></datalist>
+<div id="bm" class="ov"><div class="box" style="max-width:680px;text-align:left;max-height:92vh;overflow:auto">
+<h2 id="bh" style="margin:0 0 4px">Patches</h2><p id="bp" style="margin:0 0 10px;color:var(--mut);font-size:.85rem"></p>
+<div id="bpat" hidden><div class="row"><div><label for="bn">Patient name</label><input id="bn" placeholder="Patient name"></div><div><label for="bph">Phone (optional)</label><input id="bph" type="tel" placeholder="03xx xxxxxxx"></div></div><label for="bsv">Service</label><select id="bsv"></select></div>
+<details id="bhist" open style="margin:6px 0 10px"><summary id="bhs" style="cursor:pointer;font-weight:600">Previous bills</summary><div id="bhl" style="max-height:230px;overflow:auto"></div></details>
+<label for="bnext">Next visit date</label><input type="date" id="bnext">
+<h3 style="margin:16px 0 6px">Invoice</h3>
+<div style="overflow-x:auto"><table id="btbl"><thead><tr><th>Sr No</th><th>Item name</th><th>Price</th><th>Qty</th><th>Total</th><th></th></tr></thead><tbody id="bbody"></tbody></table></div>
+<button class="ghost" id="badd" style="margin-top:8px">+ Add item</button>
+<div style="margin-top:12px;text-align:right"><span style="font-size:1.2rem">Total: <b id="btot"></b></span></div>
+<div class="err" id="berr"></div>
+<button class="pri" id="bsave">Save bill</button>
+<div id="bdone" hidden><p id="bmsg" style="font-weight:600"></p><button class="ghost" id="bprint">🖨 Print invoice</button></div>
+<button class="ghost" id="bclose" style="width:100%;margin-top:8px">Close</button>
+</div></div>
+<div id="nvd" class="ov" style="z-index:30"><div class="box" style="max-width:380px"><h2 style="margin:0 0 8px">Next visit date</h2><p style="margin:0 0 16px">Please enter the next visit date in the box. Choose Skip to save the bill without it.</p><div style="display:flex;gap:10px"><button class="pri" id="nvok" style="margin:0">OK</button><button class="ghost" id="nvskip" style="flex:1">Skip</button></div></div></div>
 <div id="lock" style="position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;padding:16px;z-index:30"><div class="box"><h2>Staff Sign In</h2><input id="le1" type="email" placeholder="Email" autocomplete="username" style="margin-bottom:8px"><input id="lp" type="password" placeholder="Password" autocomplete="current-password"><button class="pri" id="lgo">Sign in</button><div class="err" id="lerr"></div></div></div>
 <div id="modal" role="dialog" aria-modal="true"><div class="box">
   <div class="tick">✅</div><h2 id="mh">Appointment Confirmed</h2>
@@ -96,7 +116,7 @@ L:{formTitle:"New Appointment",editTitle:"Edit Appointment",book:"Book Appointme
 P:{name:"Patient’s full name",phone:"e.g. 0300 1234567",reason:"Briefly describe the reason for the visit"},
 services:["Physiotherapy","Speech Therapy","Occupational Therapy","Psychological Counseling","Behavioral Therapy"],
 statuses:["Scheduled","Completed","Cancelled","No-show"],start:"10:00",end:"18:00",step:30,closed:[],
-wa:"Dear {name},\n\nYour appointment at {clinic} has been confirmed.\n\nService: {service}\nDate: {date}\nTime: {time}\nReason: {reason}\n\nPlease arrive 10 minutes before your scheduled time. If you need to reschedule, kindly contact us in advance.\n\nThank you,\n{clinic}"};
+wa:"Dear {name},\n\nYour appointment at {clinic} has been confirmed.\n\nService: {service}\nDate: {date}\nTime: {time}\nReason: {reason}\n\nPlease arrive 10 minutes before your scheduled time. If you need to reschedule, kindly contact us in advance.\n\nThank you,\n{clinic}",patch:"Patches",cur:"Rs",items:[{n:"Consultation",p:1500},{n:"Therapy Session",p:2500},{n:"Follow-up Visit",p:1000},{n:"Medicine / Supplies",p:500}],waf:"Dear {name},\n\nThis is a friendly reminder of your next visit at {clinic} on {date}.\n\nService: {service}\n\nIf you need to reschedule, please contact us in advance.\n\nThank you,\n{clinic}"};
 function cfgLoad(){var c={};try{c=JSON.parse(localStorage.getItem("clinic_config_v1"))||{}}catch(e){}var d=JSON.parse(JSON.stringify(DEF));for(var k in c){if(k=="L"||k=="P")Object.assign(d[k],c[k]);else d[k]=c[k]}return d}
 function toM(t){var p=t.split(":");return +p[0]*60+ +p[1]}
 function live(a){return a.status!=="Cancelled"}
@@ -144,19 +164,25 @@ function renderCal(){
  for(var d=1;d<=n;d++){var k=vy+"-"+pad(vm+1)+"-"+pad(d);
   h+='<button class="day'+(k==iso(new Date())?" today":"")+(k<iso(new Date())?" past":"")+(k==sel?" sel":"")+'" data-d="'+k+'">'+d+(cnt[k]?"<small>"+cnt[k]+"</small>":"")+'</button>'}
  $("cal").innerHTML=h;
- $("dt").textContent=dlong(sel);renderAll();
- var day=all.filter(function(a){return a.date==sel}).sort(function(a,b){return a.time<b.time?-1:1});
- $("list").innerHTML=day.length?day.map(item).join(""):'<p style="color:var(--mut)">No appointments scheduled for this day.</p>';
+ renderAll();
 }
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 
 $("cal").onclick=function(e){var b=e.target.closest("[data-d]");if(!b)return;sel=b.dataset.d;if(sel>=iso(new Date())){$("date").value=sel;fillTimes()}renderCal()};
-function item(a){var st=a.status||"Scheduled",x=live(a);return '<div class="item"'+(x?'':' style="opacity:.6"')+'><div><b>'+dlong(a.date)+' · '+t12(a.time)+' <em class="bd">'+esc(st)+'</em></b><span>'+esc(a.name)+' · '+esc(a.phone)+'<br>'+esc(a.svc)+' — '+esc(a.reason)+'</span></div><div class="acts">'+(x?'<button class="edit" data-id="'+a.id+'">Edit</button><a class="wa" target="_blank" rel="noopener" href="'+waLink(a)+'">WhatsApp</a><button class="del" data-id="'+a.id+'">Cancel</button>':'')+'</div></div>'}
-function renderAll(){var all=load().slice().sort(function(a,b){return (a.date+a.time)<(b.date+b.time)?-1:1});$("all").innerHTML=all.length?all.map(item).join(""):'<p style="color:var(--mut)">No appointments have been booked yet.</p>'}
+function item(a){var st=a.status||"Scheduled",x=live(a);return '<div class="item"'+(x?'':' style="opacity:.6"')+'><div><b>'+dlong(a.date)+' · '+t12(a.time)+' <em class="bd">'+esc(st)+'</em></b><span>'+esc(a.name)+' · '+esc(a.phone)+'<br>'+esc(a.svc)+' — '+esc(a.reason)+nv(a)+'</span></div><div class="acts">'+(x?'<button class="edit" data-id="'+a.id+'">Edit</button><a class="wa" target="_blank" rel="noopener" href="'+waLink(a)+'">WhatsApp</a><button class="del" data-id="'+a.id+'">Cancel</button><button class="bill" data-id="'+a.id+'">'+esc(C.patch||"Patches")+'</button>':'')+'</div></div>'}
+function renderAll(){var all=load().slice().sort(function(a,b){return (a.date+a.time)<(b.date+b.time)?-1:1}),td=iso(new Date()),t=all.filter(function(a){return a.date==td});
+ $("tdl").innerHTML=t.length?t.map(item).join(""):'<p class="mt">No appointments today.</p>';
+ $("all").innerHTML=all.length?all.map(item).join(""):'<p class="mt">No appointments have been booked yet.</p>';
+ $("th").textContent="Today’s Appointments ("+t.filter(live).length+")";$("ah").textContent=L.allTitle+" ("+all.length+")";renderFU(td)}
+function renderFU(td){var best={};bills().forEach(function(b){if(!b.next_visit)return;var k=pd(b.phone).length>=7?"p"+pd(b.phone):"n"+String(b.name).trim().toLowerCase();if(!best[k]||b.created>best[k].created)best[k]=b});
+ var F=Object.keys(best).map(function(k){return best[k]}).filter(function(b){return b.next_visit>=td}).sort(function(a,b){return a.next_visit<b.next_visit?-1:1});
+ $("fh").textContent="Upcoming Follow-ups ("+F.length+")";
+ $("ful").innerHTML=F.length?F.map(function(b){var n=Math.round((new Date(b.next_visit+"T00:00:00")-new Date(td+"T00:00:00"))/864e5);return '<div class="item"><div><b>'+dlong(b.next_visit)+'</b><span>'+esc(b.name)+' · '+esc(b.phone||"—")+'<br>'+esc(b.svc||"")+' · Last bill '+esc(b.bill_date)+' · '+fm(b.total)+'</span></div><div class="acts"><em class="bd">'+(n==0?"Today":n==1?"Tomorrow":"In "+n+" days")+'</em>'+fwa(b)+'</div></div>'}).join(""):'<p class="mt">No upcoming follow-ups.</p>'}
+function fwa(b){var d=waNum(b.phone||"");if(d.length<10)return '<em class="bd">No phone</em>';var m=C.waf.replace(/\{(\w+)\}/g,function(x,k){var v={name:b.name,clinic:CLINIC,service:b.svc,date:dlong(b.next_visit),phone:b.phone}[k];return v==null?x:v});return '<a class="wa" target="_blank" rel="noopener" href="https://wa.me/'+d+'?text='+encodeURIComponent(m)+'">WhatsApp</a>'}
 function resetForm(){editId=null;$("save").textContent=L.book;$("fh").textContent=L.formTitle;$("cedit").style.display="none";["name","phone","reason"].forEach(function(i){$(i).value=""});$("err").textContent="";fillTimes()}
 function startEdit(id){var a=load().filter(function(x){return String(x.id)==id})[0];if(!a)return;editId=a.id;$("name").value=a.name;$("phone").value=a.phone;$("svc").value=a.svc;$("reason").value=a.reason;$("date").value=a.date;sel=a.date;var p=sel.split("-");vy=+p[0];vm=p[1]-1;fillTimes();$("time").value=a.time;$("save").textContent=L.update;$("fh").textContent=L.editTitle;$("cedit").style.display="block";$("err").textContent="";renderCal();$("f").scrollIntoView({behavior:"smooth",block:"start"})}
-function act(e){var b=e.target.closest("button[data-id]");if(!b)return;var id=b.dataset.id;if(b.classList.contains("del")){var ap=load().filter(function(a){return String(a.id)==id})[0];if(!ap)return;var cp=Object.assign({},ap,{status:"Cancelled"});(dbOn()?dbSave([cp]):Promise.resolve()).then(function(){store(load().map(function(a){return String(a.id)==id?cp:a}));if(String(editId)==id)resetForm();fillTimes();renderCal();if(!dbOn())saveExcel(load()).then(xMsg).catch(function(){})},function(er){xMsg("Could not cancel: "+er.message)})}else if(b.classList.contains("edit")){startEdit(id)}}
-$("list").onclick=act;$("all").onclick=act;$("cedit").onclick=resetForm;
+function act(e){var b=e.target.closest("button[data-id]");if(!b)return;var id=b.dataset.id;if(b.classList.contains("del")){var ap=load().filter(function(a){return String(a.id)==id})[0];if(!ap)return;var cp=Object.assign({},ap,{status:"Cancelled"});(dbOn()?dbSave([cp]):Promise.resolve()).then(function(){store(load().map(function(a){return String(a.id)==id?cp:a}));if(String(editId)==id)resetForm();fillTimes();renderCal();if(!dbOn())saveExcel(load()).then(xMsg).catch(function(){})},function(er){xMsg("Could not cancel: "+er.message)})}else if(b.classList.contains("edit")){startEdit(id)}else if(b.classList.contains("bill")){bOpen(id)}}
+$("all").onclick=act;$("tdl").onclick=act;$("cedit").onclick=resetForm;
 $("prev").onclick=function(){vm--;if(vm<0){vm=11;vy--}renderCal()};
 $("next").onclick=function(){vm++;if(vm>11){vm=0;vy++}renderCal()};
 $("date").onchange=function(){sel=$("date").value||sel;var p=sel.split("-");vy=+p[0];vm=p[1]-1;fillTimes();renderCal()};
@@ -231,11 +257,25 @@ function dbRow(a){return{id:Number(a.id),date:a.date,time:a.time,name:a.name,pho
 function dbSave(items){return dbReq("POST","appointments?on_conflict=id",items.map(dbRow),{Prefer:"resolution=merge-duplicates,return=minimal"})}
 function dbDel(id){return dbReq("DELETE","appointments?id=eq."+encodeURIComponent(id))}
 function dbClear(){return dbReq("DELETE","appointments?id=gt.0")}
+function fm(n){return (C.cur||"")+" "+(Math.round((+n||0)*100)/100).toLocaleString()}
+function calc(items){var sub=0;items.forEach(function(x){sub+=x.p*x.q});sub=Math.round(sub*100)/100;return{sub:sub,total:sub}}
+function dbPullT(t,ord){var all=[];function pg(i){return dbReq("GET",t+"?select=*&order="+ord,null,{Range:i+"-"+(i+999),"Range-Unit":"items"}).then(function(r){all=all.concat(r);return r.length==1000?pg(i+1000):all})}return pg(0)}
+function billSave(b){return dbReq("POST","bills?on_conflict=id",[b],{Prefer:"resolution=merge-duplicates,return=minimal"})}
+function billDel(id){return dbReq("DELETE","bills?id=eq."+encodeURIComponent(id))}
+function printBill(b){var w=window.open("","_blank");if(!w)return false;
+ var r=b.items.map(function(x,i){return "<tr><td>"+(i+1)+"</td><td>"+esc(x.n)+"</td><td class=r>"+fm(x.p)+"</td><td class=r>"+x.q+"</td><td class=r>"+fm(x.p*x.q)+"</td></tr>"}).join("");
+ w.document.write("<!doctype html><html><head><meta charset=utf-8><title>Invoice</title><style>body{font-family:Arial,sans-serif;max-width:720px;margin:24px auto;color:#111;padding:0 16px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #ccc;padding:8px;text-align:left}.r{text-align:right}.t td{border:0;padding:4px 8px}h1{margin:0 0 4px}.m{color:#555}</style></head><body>"
+ +(C.logo?"<img src=\""+esc(C.logo)+"\" style=\"height:52px\"><br>":"")+"<h1>"+esc(C.clinic)+"</h1><div class=m>Invoice INV-"+String(b.id).slice(-8)+" · "+esc(b.bill_date)+"</div><hr>"
+ +"<p><b>"+esc(b.name)+"</b><br>"+esc(b.phone)+"<br>"+esc(b.svc)+"</p>"
+ +"<table><tr><th>Sr No</th><th>Item</th><th class=r>Price</th><th class=r>Qty</th><th class=r>Total</th></tr>"+r+"</table>"
+ +"<table class=t>"+(b.discount?"<tr><td class=r>Subtotal</td><td class=r>"+fm(b.subtotal)+"</td></tr><tr><td class=r>Discount"+(b.disc_type=="pct"?" ("+b.disc_value+"%)":"")+"</td><td class=r>- "+fm(b.discount)+"</td></tr>":"")+"<tr><td class=r><b>Total</b></td><td class=r><b>"+fm(b.total)+"</b></td></tr></table>"
+ +(b.next_visit?"<p><b>Next visit:</b> "+esc(b.next_visit)+"</p>":"")+"</body></html>");
+ w.document.close();w.focus();setTimeout(function(){w.print()},300);return true}
 function dbCfgGet(){return dbReq("GET","settings?id=eq.1&select=data").then(function(r){return r[0]?r[0].data:null})}
 function dbCfgSet(d){return dbReq("POST","settings?on_conflict=id",[{id:1,data:d}],{Prefer:"resolution=merge-duplicates,return=minimal"})}
 var booted=false;
 function refresh(){fillTimes();renderCal()}
-function pull(){return dbPull().then(function(rows){if(!rows.length&&load().length){xMsg("The database is empty. Upload existing data from Admin → Settings → Data.");return}store(rows);refresh();xMsg("")}).catch(function(e){xMsg("Database: "+e.message);if(!sess())gate()})}
+function pull(){return dbPull().then(function(rows){if(!rows.length&&load().length){xMsg("The database is empty. Upload existing data from Admin → Settings → Data.");return}store(rows);refresh();xMsg("");dbPullT("bills","created.desc").then(function(b){setBills(b);refresh()},function(){})}).catch(function(e){xMsg("Database: "+e.message);if(!sess())gate()})}
 function who(){var s=sess();if(!s)return;$("who").innerHTML="Signed in as "+esc(s.email)+" · <a href=\"#\" id=\"lo\">Log out</a>";$("lo").onclick=function(e){e.preventDefault();setSess(null);location.reload()}}
 function boot(){if(booted)return;booted=true;
  dbCfgGet().then(function(d){if(!d)return;var s=JSON.stringify(d);if(localStorage.getItem("clinic_cfg_db")===s)return;
@@ -245,6 +285,46 @@ function boot(){if(booted)return;booted=true;
 function gate(){if(!dbOn())return;if(sess()){$("lock").style.display="none";who();boot()}else $("lock").style.display="flex"}
 $("lgo").onclick=function(){$("lerr").textContent="";dbLogin($("le1").value.trim(),$("lp").value).then(function(){$("lp").value="";gate()}).catch(function(e){$("lerr").textContent=e.message})};
 $("lp").onkeydown=function(e){if(e.key=="Enter")$("lgo").click()};
+/* billing popup */
+var BA=null,BR=[],BS=false;
+function pd(p){var d=String(p||"").replace(/\D/g,"");if(d.indexOf("00")==0)d=d.slice(2);else if(d[0]=="0")d="92"+d.slice(1);return d}
+function same(n1,p1,n2,p2){var a=pd(p1),b=pd(p2);if(a.length>=7&&b.length>=7)return a==b;n1=String(n1||"").trim().toLowerCase();return !!n1&&n1==String(n2||"").trim().toLowerCase()}
+function bHist(){var n=BA?BA.name:$("bn").value,p=BA?BA.phone:$("bph").value,H=[],sum=0;
+ if(BA||String(n).trim()||pd(p).length>=7)H=bills().filter(function(b){return same(n,p,b.name,b.phone)}).sort(function(a,b){return a.created<b.created?1:-1});
+ H.forEach(function(b){sum+=b.total});
+ $("bhs").textContent="Previous bills ("+H.length+")"+(H.length?" · Total billed "+fm(sum):"");
+ $("bhl").innerHTML=H.length?H.map(function(b){return '<div class="item"><div><b>INV-'+String(b.id).slice(-8)+' · '+esc(b.bill_date)+'</b><span>'+b.items.map(function(x){return esc(x.n)+' ×'+x.q}).join(', ')+(b.discount?'<br>Subtotal '+fm(b.subtotal)+' · Discount '+fm(b.discount):'')+(b.next_visit?'<br>Next visit '+esc(b.next_visit):'')+'</span></div><div class="acts"><b>'+fm(b.total)+'</b><button class="edit" data-hp="'+b.id+'">Print</button></div></div>'}).join(""):'<p style="color:var(--mut);font-size:.85rem;margin:6px 0">No previous bills for this patient.</p>'}
+function bills(){try{return JSON.parse(localStorage.getItem("clinic_bills_v1"))||[]}catch(e){return[]}}
+function setBills(a){try{localStorage.setItem("clinic_bills_v1",JSON.stringify(a))}catch(e){}}
+function nv(a){var n=bills().filter(function(b){return String(b.appt_id)==String(a.id)&&b.next_visit}).sort(function(x,y){return y.created<x.created?-1:1})[0];return n?'<br>Next visit: <b>'+esc(n.next_visit)+'</b>':''}
+function bOpen(id){BA=id==null?null:load().filter(function(a){return String(a.id)==id})[0];if(id!=null&&!BA)return;BR=[{n:"",p:"",q:1}];BS=false;
+ $("bpat").hidden=!!BA;$("bh").textContent=BA?(C.patch||"Patches"):"Create Bill";$("bp").textContent=BA?BA.name+" · "+BA.svc+" · "+dlong(BA.date)+" "+t12(BA.time):"New bill for a patient";
+ if(!BA){$("bn").value="";$("bph").value="";$("bsv").innerHTML=C.services.map(function(x){return "<option>"+esc(x)+"</option>"}).join("")}
+ $("bnext").value="";$("bnext").min=iso(new Date());$("berr").textContent="";$("bdone").hidden=true;$("bsave").hidden=false;$("bsave").disabled=false;
+ $("bitems").innerHTML=C.items.map(function(x){return '<option value="'+esc(x.n)+'">'}).join("");bRows();$("bm").classList.add("open");bHist();if(dbOn())dbPullT("bills","created.desc").then(function(r){setBills(r);if($("bm").classList.contains("open"))bHist()},function(){})}
+function bValid(){return BR.filter(function(r){return String(r.n).trim()&&String(r.p)!==""&&+r.p>=0&&+r.q>0}).map(function(r){return{n:String(r.n).trim(),p:+r.p,q:+r.q}})}
+function bTot(){[].forEach.call($("bbody").rows,function(tr,i){var r=BR[i];tr.querySelector(".rt").textContent=fm((+r.p||0)*(+r.q||0))});var c=calc(bValid());$("btot").textContent=fm(c.total);return c}
+function bRows(){$("bbody").innerHTML=BR.map(function(r,i){return '<tr data-i="'+i+'"><td>'+(i+1)+'</td><td><input list="bitems" data-f="n" value="'+esc(r.n)+'" placeholder="Item name"></td><td><input type="number" min="0" step="any" data-f="p" value="'+esc(r.p)+'"></td><td><input type="number" min="0" step="any" data-f="q" value="'+esc(r.q)+'"></td><td class="rt"></td><td><button class="del" data-x="1">✕</button></td></tr>'}).join("");bTot()}
+$("bbody").oninput=function(e){var tr=e.target.closest("tr"),f=e.target.dataset.f;if(!tr||!f)return;var i=+tr.dataset.i;BR[i][f]=e.target.value;
+ if(f=="n"){var m=C.items.filter(function(x){return x.n.toLowerCase()==e.target.value.trim().toLowerCase()})[0];if(m){BR[i].p=m.p;tr.querySelector('[data-f="p"]').value=m.p}}bTot()};
+$("bbody").onclick=function(e){var b=e.target.closest("button");if(!b)return;BR.splice(+b.closest("tr").dataset.i,1);if(!BR.length)BR.push({n:"",p:"",q:1});bRows()};
+$("newbill").onclick=function(){bOpen(null)};
+$("nvok").onclick=function(){$("nvd").classList.remove("open");$("bnext").focus()};
+$("nvskip").onclick=function(){$("nvd").classList.remove("open");bSave(true)};
+$("bn").oninput=$("bph").oninput=bHist;
+$("bhl").onclick=function(e){var b=e.target.closest("[data-hp]");if(!b)return;var x=bills().filter(function(y){return String(y.id)==b.dataset.hp})[0];if(x&&!printBill(x))$("berr").textContent="Please allow pop-ups to print the invoice."};
+$("badd").onclick=function(){BR.push({n:"",p:"",q:1});bRows()};
+$("bclose").onclick=function(){$("bm").classList.remove("open")};
+$("bsave").onclick=function(){bSave(false)};
+function bSave(force){var it=bValid(),E=$("berr");
+ if(!BA&&!$("bn").value.trim())return E.textContent="Please enter the patient name.";
+ if(!it.length)return E.textContent="Add at least one item with a name, price and quantity.";
+ if(!$("bnext").value&&!force){$("nvd").classList.add("open");$("nvok").focus();return}
+ var c=calc(it);
+ var n=new Date(),b={id:Date.now(),appt_id:BA?Number(BA.id):null,name:BA?BA.name:$("bn").value.trim(),phone:BA?BA.phone:$("bph").value.trim(),svc:BA?BA.svc:$("bsv").value,bill_date:iso(n),next_visit:$("bnext").value||"",items:it,subtotal:c.total,total:c.total,created:n.toISOString()};
+ E.textContent="";$("bsave").disabled=true;
+ (dbOn()?billSave(b):Promise.resolve()).then(function(){var a=bills();a.unshift(b);setBills(a);BS=b;$("bsave").hidden=true;$("bdone").hidden=false;$("bmsg").textContent="Bill saved ✓  Total: "+fm(b.total);refresh();bHist()},function(er){$("bsave").disabled=false;E.textContent="Could not save the bill: "+er.message})};
+$("bprint").onclick=function(){if(BS&&!printBill(BS))$("berr").textContent="Please allow pop-ups to print the invoice."};
 applyCfg();$("date").value=sel;$("date").min=iso(today);fillTimes();renderCal();setInterval(fillTimes,60000);gate();
 </script>
 </body>
