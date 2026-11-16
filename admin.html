@@ -29,6 +29,9 @@ label{display:block;font-size:.8rem;color:var(--mut)}label input,label select{ma
 .wrap{overflow-x:auto;max-height:560px}table{width:100%;border-collapse:collapse;font-size:.85rem}
 th,td{padding:7px 8px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}th{color:var(--mut);position:sticky;top:0;background:var(--card)}
 .rt{text-align:right;white-space:nowrap}
+.ck{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}.ck:hover,.ck:focus-visible{transform:scale(1.03);box-shadow:0 8px 22px rgba(0,0,0,.28);outline:none}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:20px;z-index:50;overflow:auto}.ov.open{display:flex}.dbox{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;max-width:1050px;width:100%}tfoot td{font-weight:700;border-top:2px solid var(--bd)}
+.grp td{background:var(--soft)}
 .li{display:flex;gap:6px;margin-bottom:6px}.ck{display:inline-block;margin:0 12px 6px 0;color:var(--tx);font-size:.9rem}
 .logo{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap}.logo img{height:48px;border-radius:8px;border:1px solid var(--bd)}
 .lg{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}.lg .card{max-width:340px;width:100%}
@@ -58,11 +61,16 @@ th,td{padding:7px 8px;border-bottom:1px solid var(--bd);text-align:left;vertical
 <div class="card np"><div class="row"><label>From<input type="date" id="sf"></label><label>To<input type="date" id="st"></label><label>Item<select id="si"></select></label><label>Patient<input id="sq" placeholder="Name or phone"></label></div>
 <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button id="sxl" class="pri">⬇ Export Excel</button><button id="sprt">Print report</button><button id="sclr">Clear filters</button><span class="mut" id="smsg" style="align-self:center"></span></div></div>
 <div class="cards" id="scards"></div><div class="g2" id="sbars"></div>
+<div class="card"><h3>Outstanding balances (patient-wise)</h3><p class="mut" style="margin:0 0 8px">All bills with an unpaid balance. Not affected by the filters above.</p>
+<div class="row np"><label>Search patient<input id="bq" placeholder="Name or phone"></label><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="bxl" class="pri">⬇ Excel</button><button id="bpr">🖨 Print</button></div></div>
+<p id="bsum" style="font-weight:600"></p>
+<div class="wrap"><table><thead><tr><th>Patient</th><th>Phone / Invoice</th><th>Details</th><th class="rt">Total</th><th class="rt">Received</th><th class="rt">Balance due</th><th class="np"></th></tr></thead><tbody id="bb"></tbody><tfoot id="bf"></tfoot></table></div></div>
 <div class="card"><h3>Upcoming follow-ups</h3><div id="sfu"></div></div>
-<div class="card"><h3>Bills</h3><div class="wrap"><table><thead><tr><th>Invoice</th><th>Date</th><th>Patient</th><th>Phone</th><th>Service</th><th>Items</th><th>Total</th><th>Next visit</th><th class="np"></th></tr></thead><tbody id="sb"></tbody></table></div></div>
+<div class="card"><h3>Bills</h3><div class="wrap"><table><thead><tr><th>Invoice</th><th>Date</th><th>Patient</th><th>Phone</th><th>Service</th><th>Items</th><th>Total</th><th>Received</th><th>Balance</th><th>Next visit</th><th class="np"></th></tr></thead><tbody id="sb"></tbody></table></div></div>
 </section>
 <section id="set" hidden></section>
 </main></div>
+<div id="dm" class="ov"><div class="dbox"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3 id="dtt" style="margin:0"></h3><div class="np" style="display:flex;gap:8px;flex-wrap:wrap"><button id="dxl" class="pri">⬇ Excel</button><button id="dpr">🖨 Print</button><button id="dcl">✕ Close</button></div></div><p class="mut" id="dnt" style="margin:6px 0 10px"></p><div class="cards" id="dst"></div><div class="wrap" style="max-height:68vh"><table><thead id="dth"></thead><tbody id="dtb"></tbody><tfoot id="dtf"></tfoot></table></div></div></div>
 <div id="toast"></div>
 
 <script>
@@ -116,9 +124,10 @@ function mkSess(j){var p=jwt(j.access_token);return{at:j.access_token,rt:j.refre
 function dbAuth(grant,body){return fetch(SB.url+"/auth/v1/token?grant_type="+grant,{method:"POST",headers:{apikey:SB.key,"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error_description||j.msg||"Sign-in failed");return j})})}
 function dbLogin(email,pw){return dbAuth("password",{email:email,password:pw}).then(function(j){var s=mkSess(j);if(["admin","staff"].indexOf(s.role)<0)throw new Error("This account has no access. Ask the admin to assign it a role.");setSess(s);return s})}
 function dbToken(){var s=sess();if(!s)return Promise.reject(new Error("Please sign in."));if(Date.now()<s.exp-60000)return Promise.resolve(s.at);return dbAuth("refresh_token",{refresh_token:s.rt}).then(function(j){var n=mkSess(j);setSess(n);return n.at},function(){setSess(null);throw new Error("Session expired. Please sign in again.")})}
-function dbReq(method,path,body,extra){return dbToken().then(function(t){var h={apikey:SB.key,Authorization:"Bearer "+t,"Content-Type":"application/json"};for(var k in extra||{})h[k]=extra[k];return fetch(SB.url+"/rest/v1/"+path,{method:method,headers:h,body:body?JSON.stringify(body):undefined})}).then(function(r){
+function dbReq(method,path,body,extra){return dbToken().then(function(t){var h={apikey:SB.key,Authorization:"Bearer "+t,"Content-Type":"application/json"};for(var k in extra||{})h[k]=extra[k];return fetch(SB.url+"/rest/v1/"+path,{method:method,headers:h,body:body?JSON.stringify(body):undefined}).catch(function(){throw new Error("Cannot reach Supabase. Check the Project URL in config.js and your internet connection.")})}).then(function(r){
  if(r.ok)return r.text().then(function(x){return x?JSON.parse(x):[]});
- return r.json().catch(function(){return{}}).then(function(j){var e=new Error(j.message||("Database error "+r.status));e.code=j.code;e.status=r.status;throw e})})}
+ return r.json().catch(function(){return{}}).then(function(j){var e=new Error(dbHint(r.status,j));e.code=j.code;e.status=r.status;throw e})})}
+function dbHint(s,j){var m=j.message||"";if(j.code=="PGRST204")return "A database column is missing. Run the latest supabase-setup.sql in the Supabase SQL Editor. "+m;if(s==401)return "Not signed in or the session expired (401). Please sign in again.";if(s==403||j.code=="42501")return "Permission denied ("+s+"). The user needs the admin or staff role, and supabase-setup.sql must have been run. "+m;if(s==404||j.code=="PGRST205"||j.code=="42P01")return "Database table not found. Run supabase-setup.sql in the Supabase SQL Editor. "+m;return m||("Database error "+s)}
 function dbPull(){var all=[];function pg(i){return dbReq("GET","appointments?select=*&order=date.asc,time.asc",null,{Range:i+"-"+(i+999),"Range-Unit":"items"}).then(function(rows){all=all.concat(rows);return rows.length==1000?pg(i+1000):all})}return pg(0)}
 function dbRow(a){return{id:Number(a.id),date:a.date,time:a.time,name:a.name,phone:String(a.phone||""),svc:a.svc,reason:a.reason,status:a.status||"Scheduled",created:a.created||new Date().toISOString(),updated:new Date().toISOString()}}
 function dbSave(items){return dbReq("POST","appointments?on_conflict=id",items.map(dbRow),{Prefer:"resolution=merge-duplicates,return=minimal"})}
@@ -135,7 +144,7 @@ function printBill(b){var w=window.open("","_blank");if(!w)return false;
  +(C.logo?"<img src=\""+esc(C.logo)+"\" style=\"height:52px\"><br>":"")+"<h1>"+esc(C.clinic)+"</h1><div class=m>Invoice INV-"+String(b.id).slice(-8)+" · "+esc(b.bill_date)+"</div><hr>"
  +"<p><b>"+esc(b.name)+"</b><br>"+esc(b.phone)+"<br>"+esc(b.svc)+"</p>"
  +"<table><tr><th>Sr No</th><th>Item</th><th class=r>Price</th><th class=r>Qty</th><th class=r>Total</th></tr>"+r+"</table>"
- +"<table class=t>"+(b.discount?"<tr><td class=r>Subtotal</td><td class=r>"+fm(b.subtotal)+"</td></tr><tr><td class=r>Discount"+(b.disc_type=="pct"?" ("+b.disc_value+"%)":"")+"</td><td class=r>- "+fm(b.discount)+"</td></tr>":"")+"<tr><td class=r><b>Total</b></td><td class=r><b>"+fm(b.total)+"</b></td></tr></table>"
+ +"<table class=t>"+(b.discount?"<tr><td class=r>Subtotal</td><td class=r>"+fm(b.subtotal)+"</td></tr><tr><td class=r>Discount"+(b.disc_type=="pct"?" ("+b.disc_value+"%)":"")+"</td><td class=r>- "+fm(b.discount)+"</td></tr>":"")+"<tr><td class=r><b>Total</b></td><td class=r><b>"+fm(b.total)+"</b></td></tr>"+(b.received>0||b.balance>0?"<tr><td class=r>Received</td><td class=r>"+fm(b.total-(+b.balance||0))+"</td></tr><tr><td class=r><b>Balance due</b></td><td class=r><b>"+fm(+b.balance||0)+"</b></td></tr>":"")+"</table>"
  +(b.next_visit?"<p><b>Next visit:</b> "+esc(b.next_visit)+"</p>":"")+"</body></html>");
  w.document.close();w.focus();setTimeout(function(){w.print()},300);return true}
 function dbCfgGet(){return dbReq("GET","settings?id=eq.1&select=data").then(function(r){return r[0]?r[0].data:null})}
@@ -154,16 +163,16 @@ function billsF(){var f=$("sf").value,t=$("st").value,it=$("si").value,q=$("sq")
 function sumg(A,kf,vf){var m={};A.forEach(function(a){var k=kf(a);m[k]=(m[k]||0)+vf(a)});return m}
 function topN(m,n){var o={};Object.keys(m).sort(function(a,b){return m[b]-m[a]}).slice(0,n).forEach(function(k){o[k]=m[k]});return o}
 function allItems(){var s=C.items.map(function(x){return x.n});jget(KB,[]).forEach(function(b){b.items.forEach(function(x){if(s.indexOf(x.n)<0)s.push(x.n)})});return s}
-function sal(){var B=billsF(),all=jget(KB,[]),n=new Date(),td=n.getFullYear()+"-"+pad(n.getMonth()+1)+"-"+pad(n.getDate()),mo=td.slice(0,7),R=function(x){return Math.round(x*100)/100};
+function sal(){balSec();var B=billsF(),all=jget(KB,[]),n=new Date(),td=n.getFullYear()+"-"+pad(n.getMonth()+1)+"-"+pad(n.getDate()),mo=td.slice(0,7),R=function(x){return Math.round(x*100)/100};
  var g=0,d=0,t=0,q=0,tdS=0,moS=0;B.forEach(function(b){t+=b.total;b.items.forEach(function(x){q+=x.q})});
  all.forEach(function(b){if(b.bill_date==td)tdS+=b.total;if(b.bill_date.slice(0,7)==mo)moS+=b.total});
  var si=$("si").value;$("si").innerHTML=opts(allItems(),"All items");$("si").value=si;
- $("scards").innerHTML=kc("Bills",B.length)+kc("Total sales",fm(t))+kc("Average bill",fm(B.length?t/B.length:0))+kc("Items sold",R(q))+kc("Today’s sales",fm(tdS))+kc("This month",fm(moS));
+ $("scards").innerHTML=kc("Bills",B.length,"bills")+kc("Total sales",fm(t),"sales")+kc("Average bill",fm(B.length?t/B.length:0),"avg")+kc("Items sold",R(q),"items")+kc("Today’s sales",fm(tdS),"today")+kc("This month",fm(moS),"month")+kc("Received",fm(B.reduce(function(x,b){return x+rcv(b)},0)),"rec")+kc("Balance due",fm(all.reduce(function(x,b){return x+bal(b)},0)),"bal");
  var im={},iq={};B.forEach(function(b){b.items.forEach(function(x){im[x.n]=(im[x.n]||0)+x.p*x.q;iq[x.n]=(iq[x.n]||0)+x.q})});
- $("sbars").innerHTML=bars("Revenue by item",im,0,0,fm)+bars("Quantity sold by item",iq)+bars("Net sales by month",sumg(B,function(b){return b.bill_date.slice(0,7)},function(b){return b.total}),1,0,fm)+bars("Net sales by service",sumg(B,function(b){return b.svc||"—"},function(b){return b.total}),0,0,fm)+bars("Top patients by spend",topN(sumg(B,function(b){return b.name+" ("+b.phone+")"},function(b){return b.total}),8),0,0,fm);
+ $("sbars").innerHTML=bars("Revenue by item",im,0,0,fm,"rev")+bars("Quantity sold by item",iq,0,0,0,"qty")+bars("Net sales by month",sumg(B,function(b){return b.bill_date.slice(0,7)},function(b){return b.total}),1,0,fm,"mon")+bars("Net sales by service",sumg(B,function(b){return b.svc||"—"},function(b){return b.total}),0,0,fm,"svc")+bars("Top patients by spend",topN(sumg(B,function(b){return b.name+" ("+b.phone+")"},function(b){return b.total}),8),0,0,fm,"pat");
  var seen={},fu=all.slice().sort(function(a,b){return a.created<b.created?1:-1}).filter(function(b){var k=b.appt_id||("b"+b.id);if(seen[k])return false;seen[k]=1;return b.next_visit&&b.next_visit>=td}).sort(function(a,b){return a.next_visit<b.next_visit?-1:1}).slice(0,15);
  $("sfu").innerHTML=fu.length?fu.map(function(b){return '<div class="bar"><span style="width:110px">'+esc(b.next_visit)+'</span><span style="flex:1">'+esc(b.name)+' · '+esc(b.phone)+'</span></div>'}).join(""):'<p class="mut">No upcoming follow-ups.</p>';
- $("sb").innerHTML=B.length?B.map(function(b){return '<tr><td>INV-'+String(b.id).slice(-8)+'</td><td>'+esc(b.bill_date)+'</td><td>'+esc(b.name)+'</td><td>'+esc(b.phone)+'</td><td>'+esc(b.svc)+'</td><td>'+b.items.map(function(x){return esc(x.n)+' ×'+x.q}).join(', ')+'</td><td class="rt"><b>'+fm(b.total)+'</b></td><td>'+esc(b.next_visit||"—")+'</td><td class="np"><button data-pr="'+b.id+'">Print</button> <button class="del" data-bd="'+b.id+'">Delete</button></td></tr>'}).join(""):'<tr><td colspan="9" class="mut">No bills match the filters.</td></tr>'}
+ $("sb").innerHTML=B.length?B.map(function(b){return '<tr><td>INV-'+String(b.id).slice(-8)+'</td><td>'+esc(b.bill_date)+'</td><td>'+esc(b.name)+'</td><td>'+esc(b.phone)+'</td><td>'+esc(b.svc)+'</td><td>'+b.items.map(function(x){return esc(x.n)+' ×'+x.q}).join(', ')+'</td><td class="rt"><b>'+fm(b.total)+'</b></td><td class="rt">'+fm(rcv(b))+'</td><td class="rt">'+(bal(b)>0?'<b style="color:var(--dng)">'+fm(bal(b))+'</b>':fm(0))+'</td><td>'+esc(b.next_visit||"—")+'</td><td class="np"><button data-pr="'+b.id+'">Print</button> <button class="del" data-bd="'+b.id+'">Delete</button></td></tr>'}).join(""):'<tr><td colspan="11" class="mut">No bills match the filters.</td></tr>'}
 ["sf","st","si","sq"].forEach(function(i){$(i).oninput=sal});
 $("sclr").onclick=function(){["sf","st","si","sq"].forEach(function(i){$(i).value=""});sal()};
 $("sprt").onclick=function(){window.print()};
@@ -173,14 +182,90 @@ $("sb").onclick=function(e){var p=e.target.closest("[data-pr]"),d=e.target.close
 $("sxl").onclick=function(){if(!window.XLSX)return toast("Excel library could not load. Please check your internet connection.");var B=billsF(),im={},mm={};
  B.forEach(function(b){b.items.forEach(function(x){var o=im[x.n]||(im[x.n]={q:0,r:0});o.q+=x.q;o.r+=x.p*x.q});var k=b.bill_date.slice(0,7),m=mm[k]||(mm[k]={n:0,t:0});m.n++;m.t+=b.total});
  var wb=XLSX.utils.book_new();
- XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(B.map(function(b){return{"Invoice":"INV-"+String(b.id).slice(-8),"Date":b.bill_date,"Patient":b.name,"Phone":String(b.phone),"Service":b.svc,"Items":b.items.map(function(x){return x.n+" x"+x.q+" @"+x.p}).join(", "),"Total":b.total,"Next Visit":b.next_visit}})),"Bills");
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(B.map(function(b){return{"Invoice":"INV-"+String(b.id).slice(-8),"Date":b.bill_date,"Patient":b.name,"Phone":String(b.phone),"Service":b.svc,"Items":b.items.map(function(x){return x.n+" x"+x.q+" @"+x.p}).join(", "),"Total":b.total,"Received":rcv(b),"Balance":bal(b),"Next Visit":b.next_visit}})),"Bills");
  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(Object.keys(im).map(function(k){return{"Item":k,"Qty sold":im[k].q,"Revenue":im[k].r}})),"Items");
  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(Object.keys(mm).sort().map(function(k){return{"Month":k,"Bills":mm[k].n,"Total sales":mm[k].t}})),"Monthly");
  XLSX.writeFile(wb,"sales-report.xlsx");toast("Sales report downloaded.")};
+/* sales card details */
+/* balances */
+function bal(b){return Math.round((+b.balance||0)*100)/100}
+function rcv(b){return Math.round(((+b.total||0)-bal(b))*100)/100}
+function balList(q){var all=jget(KB,[]).filter(function(b){return bal(b)>0}),m=gBy(all,function(b){return pk(b.phone,b.name)});
+ return Object.keys(m).map(function(k){var l=m[k].slice().sort(function(x,y){return x.bill_date<y.bill_date?-1:1}),la=l[l.length-1],g={l:l,name:la.name,phone:la.phone,due:0,billed:0,rec:0};l.forEach(function(b){g.due+=bal(b);g.billed+=b.total;g.rec+=rcv(b)});return g}).filter(function(g){return !q||(g.name+" "+g.phone).toLowerCase().indexOf(q)>-1}).sort(function(x,y){return y.due-x.due})}
+function balSec(){var q=($("bq").value||"").toLowerCase(),G=balList(q),T=0,BI=0,RC=0;G.forEach(function(g){T+=g.due;BI+=g.billed;RC+=g.rec});
+ $("bsum").textContent=G.length?G.length+" patient(s) with an unpaid balance · Total outstanding "+fm(T):"No outstanding balances.";
+ $("bb").innerHTML=G.length?G.map(function(g){return '<tr class="grp"><td><b>'+esc(g.name)+'</b></td><td>'+esc(g.phone||"—")+'</td><td>'+g.l.length+' unpaid bill(s)</td><td class="rt">'+fm(g.billed)+'</td><td class="rt">'+fm(g.rec)+'</td><td class="rt"><b style="color:var(--dng)">'+fm(g.due)+'</b></td><td class="np"></td></tr>'+g.l.map(function(b){return '<tr><td></td><td class="mut">'+inv(b)+'</td><td>'+esc(b.bill_date)+' · '+esc(b.items.map(function(x){return x.n+" ×"+x.q}).join(", "))+'</td><td class="rt">'+fm(b.total)+'</td><td class="rt">'+fm(rcv(b))+'</td><td class="rt">'+fm(bal(b))+'</td><td class="np"><button data-rc="'+b.id+'">Receive payment</button></td></tr>'}).join("")}).join(""):'<tr><td colspan="7" class="mut">No outstanding balances.</td></tr>';
+ $("bf").innerHTML=G.length?'<tr><td colspan="3">Total outstanding</td><td class="rt">'+fm(BI)+'</td><td class="rt">'+fm(RC)+'</td><td class="rt">'+fm(T)+'</td><td class="np"></td></tr>':""}
+function tBal(q){var G=balList(q||""),T=0,BI=0,RC=0,N=0;G.forEach(function(g){T+=g.due;BI+=g.billed;RC+=g.rec;N+=g.l.length});
+ return{head:["#","Patient","Phone","Unpaid bills","Total billed","Received","Balance due","Oldest unpaid","Latest unpaid"],right:[0,3,4,5,6],rows:G.map(function(g,i){return[i+1,g.name,g.phone||"—",g.l.length,fm(g.billed),fm(g.rec),fm(g.due),g.l[0].bill_date,g.l[g.l.length-1].bill_date]}),foot:["","Total ("+G.length+" patients)","",N,fm(BI),fm(RC),fm(T),"",""]}}
+$("bq").oninput=balSec;
+$("bxl").onclick=function(){var q=($("bq").value||"").toLowerCase(),o=tBal(q);o.title="Outstanding balances";o.note="Bills with an unpaid balance"+(q?" — Patient: "+q:"");DD=o;$("dxl").click()};
+$("bpr").onclick=function(){var q=($("bq").value||"").toLowerCase(),o=tBal(q);o.title="Outstanding balances";o.note="Bills with an unpaid balance"+(q?" — Patient: "+q:"");DD=o;$("dpr").click()};
+$("bb").onclick=function(e){var r=e.target.closest("[data-rc]");if(!r)return;var L=jget(KB,[]),b=L.filter(function(x){return String(x.id)==r.dataset.rc})[0];if(!b)return;var due=bal(b);
+ var v=prompt("Amount received now (balance due "+fm(due)+"):",due);if(v===null)return;var a=Math.round(parseFloat(v)*100)/100;
+ if(!(a>0)||a>due)return toast("Enter an amount greater than 0 and not more than "+fm(due)+".");
+ b.received=Math.round((rcv(b)+a)*100)/100;b.balance=Math.round((due-a)*100)/100;
+ (dbOn()?billSave(b):Promise.resolve()).then(function(){jset(KB,L);sal();toast("Payment of "+fm(a)+" recorded.")},function(x){toast("Database error: "+x.message)})};
+
+var DD=null;
+function inv(b){return "INV-"+String(b.id).slice(-8)}
+function pc(x,t){return t?(Math.round(x/t*1000)/10)+"%":"—"}
+function pk(p,n){var d=String(p||"").replace(/\D/g,"");if(d.indexOf("00")==0)d=d.slice(2);else if(d[0]=="0")d="92"+d.slice(1);return d.length>=7?"p"+d:"n"+String(n||"").trim().toLowerCase()}
+function nQ(b){var q=0;b.items.forEach(function(x){q+=x.q});return q}
+function sumT(L){var t=0;L.forEach(function(b){t+=b.total});return t}
+function sumQ(L){var q=0;L.forEach(function(b){q+=nQ(b)});return q}
+function gBy(L,kf){var m={};L.forEach(function(b){var k=kf(b);(m[k]=m[k]||[]).push(b)});return m}
+function fnote(){var f=$("sf").value,t=$("st").value,i=$("si").value,q=$("sq").value,p=[];if(f)p.push("From "+f);if(t)p.push("To "+t);if(i)p.push("Item: "+i);if(q)p.push("Patient: "+q);return p.length?"Filters applied — "+p.join(" · "):"All bills (no filters)"}
+function tBills(L){var T=sumT(L),RC=0,BL=0;L.forEach(function(b){RC+=rcv(b);BL+=bal(b)});return{head:["Invoice","Date","Patient","Phone","Service","Items","Total","Received","Balance","Next visit"],right:[6,7,8],rows:L.map(function(b){return[inv(b),b.bill_date,b.name,b.phone,b.svc||"—",b.items.map(function(x){return x.n+" ×"+x.q}).join(", "),fm(b.total),fm(rcv(b)),fm(bal(b)),b.next_visit||"—"]}),foot:["Total ("+L.length+" bills)","","","","","",fm(T),fm(RC),fm(BL),""]}}
+function tDays(L){var m=gBy(L,function(b){return b.bill_date}),T=sumT(L);return{head:["Date","Day","Bills","Items sold","Total sales","% of total"],right:[2,3,4,5],rows:Object.keys(m).sort().map(function(k){var l=m[k],t=sumT(l);return[k,DN[new Date(k+"T00:00:00").getDay()],l.length,sumQ(l),fm(t),pc(t,T)]}),foot:["Total","",L.length,sumQ(L),fm(T),T?"100%":"—"]}}
+function tItems(L,by){var m={},T=0,Q=0;L.forEach(function(b){var seen={};b.items.forEach(function(x){var o=m[x.n]||(m[x.n]={q:0,r:0,b:0});o.q+=x.q;o.r+=x.p*x.q;if(!seen[x.n]){o.b++;seen[x.n]=1}T+=x.p*x.q;Q+=x.q})});
+ var k=Object.keys(m).sort(function(a,b){return by=="q"?m[b].q-m[a].q:m[b].r-m[a].r});
+ return{head:["Item","Qty sold","Revenue","% of revenue","Avg price","In bills"],right:[1,2,3,4,5],rows:k.map(function(n){var o=m[n];return[n,o.q,fm(o.r),pc(o.r,T),fm(o.q?o.r/o.q:0),o.b]}),foot:["Total",Q,fm(T),T?"100%":"—",""," "]}}
+function tGroup(L,kf,label){var m=gBy(L,kf),T=sumT(L);return{head:[label,"Bills","Items sold","Total sales","Average bill","% of total"],right:[1,2,3,4,5],rows:Object.keys(m).sort(function(a,b){return label=="Month"?(a<b?-1:1):sumT(m[b])-sumT(m[a])}).map(function(k){var l=m[k],t=sumT(l);return[k,l.length,sumQ(l),fm(t),fm(t/l.length),pc(t,T)]}),foot:["Total",L.length,sumQ(L),fm(T),fm(L.length?T/L.length:0),T?"100%":"—"]}}
+function tPat(L){var m=gBy(L,function(b){return pk(b.phone,b.name)}),T=sumT(L),ks=Object.keys(m).sort(function(a,b){return sumT(m[b])-sumT(m[a])});
+ return{head:["#","Patient","Phone","Bills","Total spent","Average bill","Last bill","Last service"],right:[0,3,4,5],rows:ks.map(function(k,i){var l=m[k].slice().sort(function(a,b){return a.created<b.created?1:-1}),t=sumT(l);return[i+1,l[0].name,l[0].phone||"—",l.length,fm(t),fm(t/l.length),l[0].bill_date,l[0].svc||"—"]}),foot:["","Total ("+ks.length+" patients)","",L.length,fm(T),fm(L.length?T/L.length:0),"",""]}}
+function tAvg(L){var T=sumT(L),a=L.length?T/L.length:0,s=L.map(function(b){return b.total}).sort(function(x,y){return x-y}),n=s.length,md=n?(n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2):0;
+ return{stats:[["Average bill",fm(a)],["Median bill",fm(md)],["Highest bill",fm(n?s[n-1]:0)],["Lowest bill",fm(n?s[0]:0)]],head:["Invoice","Date","Patient","Total","Vs average"],right:[3,4],rows:L.slice().sort(function(x,y){return y.total-x.total}).map(function(b){var d=b.total-a;return[inv(b),b.bill_date,b.name,fm(b.total),(d>=0?"+ ":"- ")+fm(Math.abs(d))]}),foot:["Average ("+n+" bills)","","",fm(a),""]}}
+function detail(k){var B=billsF(),all=jget(KB,[]),n=new Date(),td=n.getFullYear()+"-"+pad(n.getMonth()+1)+"-"+pad(n.getDate()),mo=td.slice(0,7),o,ti,nt=fnote();
+ if(k=="bills"){ti="Bills";o=tBills(B)}
+ else if(k=="sales"){ti="Total sales — day by day";o=tDays(B)}
+ else if(k=="avg"){ti="Average bill";o=tAvg(B)}
+ else if(k=="items"||k=="qty"){ti=k=="qty"?"Quantity sold by item":"Items sold";o=tItems(B,"q")}
+ else if(k=="rev"){ti="Revenue by item";o=tItems(B,"r")}
+ else if(k=="rec"){ti="Received payments";o=tBills(B)}
+ else if(k=="bal"){ti="Balance due — patient wise";nt="All bills (not affected by the filters)";o=tBal()}
+ else if(k=="today"){ti="Today’s sales ("+td+")";nt="Not affected by the filters";o=tBills(all.filter(function(b){return b.bill_date==td}))}
+ else if(k=="month"){ti="This month’s sales ("+mo+") — day by day";nt="Not affected by the filters";o=tDays(all.filter(function(b){return b.bill_date.slice(0,7)==mo}))}
+ else if(k=="mon"){ti="Net sales by month";o=tGroup(B,function(b){return b.bill_date.slice(0,7)},"Month")}
+ else if(k=="svc"){ti="Net sales by service";o=tGroup(B,function(b){return b.svc||"—"},"Service")}
+ else if(k=="pat"){ti="Patients by spend";o=tPat(B)}
+ else return;
+ o.title=ti;o.note=nt;DD=o;var R=function(i){return o.right.indexOf(i)>-1?' class="rt"':""};
+ $("dtt").textContent=ti;$("dnt").textContent=nt;
+ $("dst").innerHTML=(o.stats||[]).map(function(s){return kc(s[0],s[1])}).join("");
+ $("dth").innerHTML="<tr>"+o.head.map(function(h,i){return"<th"+R(i)+">"+esc(h)+"</th>"}).join("")+"</tr>";
+ $("dtb").innerHTML=o.rows.length?o.rows.map(function(r){return"<tr>"+r.map(function(c,i){return"<td"+R(i)+">"+esc(c)+"</td>"}).join("")+"</tr>"}).join(""):'<tr><td colspan="'+o.head.length+'" class="mut">No data for this report.</td></tr>';
+ $("dtf").innerHTML=o.rows.length?"<tr>"+o.foot.map(function(c,i){return"<td"+R(i)+">"+esc(c)+"</td>"}).join("")+"</tr>":"";
+ $("dm").classList.add("open");$("dm").scrollTop=0}
+$("scards").onclick=$("sbars").onclick=function(e){var c=e.target.closest("[data-d]");if(c)detail(c.dataset.d)};
+$("scards").onkeydown=$("sbars").onkeydown=function(e){var c=e.target;if((e.key=="Enter"||e.key==" ")&&c.dataset&&c.dataset.d){e.preventDefault();detail(c.dataset.d)}};
+$("dcl").onclick=function(){$("dm").classList.remove("open")};
+$("dm").onclick=function(e){if(e.target.id=="dm")$("dm").classList.remove("open")};
+document.addEventListener("keydown",function(e){if(e.key=="Escape")$("dm").classList.remove("open")});
+$("dpr").onclick=function(){var t=DD;if(!t)return;var w=window.open("","_blank");if(!w)return toast("Please allow pop-ups to print.");
+ var R=function(i){return t.right.indexOf(i)>-1?" class=r":""};
+ w.document.write("<!doctype html><html><head><meta charset=utf-8><title>"+esc(t.title)+"</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#111}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}th,td{border-bottom:1px solid #ccc;padding:6px 8px;text-align:left}.r{text-align:right}tfoot td{font-weight:bold;border-top:2px solid #333}h2{margin:0 0 4px}.m{color:#555}</style></head><body><h2>"+esc(C.clinic)+" — "+esc(t.title)+"</h2><div class=m>"+esc(t.note)+" · Generated "+esc(new Date().toLocaleString())+"</div>"
+ +(t.stats?"<p>"+t.stats.map(function(s){return"<b>"+esc(s[0])+":</b> "+esc(s[1])}).join(" &nbsp;·&nbsp; ")+"</p>":"")
+ +"<table><thead><tr>"+t.head.map(function(h,i){return"<th"+R(i)+">"+esc(h)+"</th>"}).join("")+"</tr></thead><tbody>"+t.rows.map(function(r){return"<tr>"+r.map(function(c,i){return"<td"+R(i)+">"+esc(c)+"</td>"}).join("")+"</tr>"}).join("")+"</tbody><tfoot><tr>"+t.foot.map(function(c,i){return"<td"+R(i)+">"+esc(c)+"</td>"}).join("")+"</tr></tfoot></table></body></html>");
+ w.document.close();w.focus();setTimeout(function(){w.print()},300)};
+$("dxl").onclick=function(){var t=DD;if(!t)return;if(!window.XLSX)return toast("Excel library could not load. Please check your internet connection.");
+ var a=[[C.clinic+" — "+t.title],[t.note],[]].concat((t.stats||[]).map(function(s){return[s[0],s[1]]}),t.stats?[[]]:[],[t.head],t.rows,[t.foot]),wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a),"Detail");XLSX.writeFile(wb,"sales-detail.xlsx");toast("Excel file downloaded.")};
 /* login */
 function ok(){try{return sessionStorage.getItem("adm")=="1"}catch(e){return false}}
 function show(){$("login").hidden=true;$("app").hidden=false;$("ttl").textContent=C.clinic+" – Admin";fillFilters();rep();setUI();dbBoot()}
 function enter(){try{sessionStorage.setItem("adm","1")}catch(e){}show()}
+if(!dbOn())$("le").textContent="⚠ Database not connected (config.js is empty or not loaded). Data stays in this browser only.";
 if(dbOn()){$("em").hidden=false}
 else if(!hasPw()){$("lt").textContent="Create admin password";$("pw2").hidden=false;$("go").textContent="Set password & continue"}
 $("go").onclick=function(){var v=$("pw").value;
@@ -198,9 +283,9 @@ function fillFilters(){var s=$("fs").value,t=$("ft").value;$("fs").innerHTML=opt
 function filtered(){var f=$("ff").value,t=$("fto").value,s=$("fs").value,st=$("ft").value,q=$("fq").value.toLowerCase();
 return jget(KA,[]).filter(function(a){var S=a.status||"Scheduled";return (!f||a.date>=f)&&(!t||a.date<=t)&&(!s||a.svc==s)&&(!st||S==st)&&(!q||(a.name+" "+a.phone+" "+a.reason).toLowerCase().indexOf(q)>-1)}).sort(function(a,b){return (a.date+a.time)<(b.date+b.time)?-1:1})}
 function grp(A,fn){var m={};A.forEach(function(a){var k=fn(a);m[k]=(m[k]||0)+1});return m}
-function bars(title,m,asc,lb,f){var k=Object.keys(m);k.sort(asc?function(a,b){return a<b?-1:1}:function(a,b){return m[b]-m[a]});var mx=Math.max.apply(null,k.map(function(x){return m[x]}).concat([1]));
-return '<div class="card"><h3>'+title+'</h3>'+(k.length?k.map(function(x){return '<div class="bar"><span>'+esc(lb?lb(x):x)+'</span><span class="t"><i style="width:'+m[x]/mx*100+'%"></i></span><b>'+(f?f(m[x]):m[x])+'</b></div>'}).join(""):'<p class="mut">No data</p>')+'</div>'}
-function kc(l,v){return '<div class="k"><b>'+v+'</b><span>'+esc(l)+'</span></div>'}
+function bars(title,m,asc,lb,f,dk){var k=Object.keys(m);k.sort(asc?function(a,b){return a<b?-1:1}:function(a,b){return m[b]-m[a]});var mx=Math.max.apply(null,k.map(function(x){return m[x]}).concat([1]));
+return '<div class="card'+(dk?' ck':'')+'"'+(dk?' data-d="'+dk+'" tabindex="0" role="button"':'')+'><h3>'+title+'</h3>'+(k.length?k.map(function(x){return '<div class="bar"><span>'+esc(lb?lb(x):x)+'</span><span class="t"><i style="width:'+m[x]/mx*100+'%"></i></span><b>'+(f?f(m[x]):m[x])+'</b></div>'}).join(""):'<p class="mut">No data</p>')+'</div>'}
+function kc(l,v,k){return '<div class="k'+(k?' ck':'')+'"'+(k?' data-d="'+k+'" tabindex="0" role="button"':'')+'><b>'+v+'</b><span>'+esc(l)+'</span></div>'}
 function rep(){var A=filtered(),n=new Date(),td=n.getFullYear()+"-"+pad(n.getMonth()+1)+"-"+pad(n.getDate());
 var S=function(a){return a.status||"Scheduled"},st=grp(A,S);
 $("cards").innerHTML=kc("Total appointments",A.length)+kc("Unique patients",Object.keys(grp(A,function(a){return a.phone.replace(/\D/g,"")})).length)+kc("Today",A.filter(function(a){return a.date==td}).length)+kc("Upcoming",A.filter(function(a){return a.date>=td&&S(a)!="Cancelled"}).length)+C.statuses.map(function(s){return kc(s,st[s]||0)}).join("");
