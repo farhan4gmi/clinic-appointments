@@ -81,6 +81,7 @@ button{font:inherit;cursor:pointer;border:0;border-radius:9px;padding:11px 14px}
 <div class="card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="pri" id="newbill" style="width:auto;margin:0">🧾 Create Bill</button><button class="ghost" id="xls">⬇ Download Excel</button><span id="gst" style="color:var(--mut);font-size:.85rem"></span></div>
 <details class="card dd" open><summary id="th">Today’s Appointments</summary><div id="tdl"></div></details>
 <details class="card dd"><summary id="fh">Upcoming Follow-ups</summary><div id="ful"></div></details>
+<details class="card dd"><summary id="obh">Outstanding Balances (patient-wise)</summary><input id="obq" placeholder="Search patient (name or phone)" style="margin-bottom:8px"><div id="obl"></div></details>
 <details class="card dd"><summary id="ah">All Appointments</summary><div id="all"></div></details>
 </section>
 </main>
@@ -175,7 +176,7 @@ function item(a){var st=a.status||"Scheduled",x=live(a);return '<div class="item
 function renderAll(){var all=load().slice().sort(function(a,b){return (a.date+a.time)<(b.date+b.time)?-1:1}),td=iso(new Date()),t=all.filter(function(a){return a.date==td});
  $("tdl").innerHTML=t.length?t.map(item).join(""):'<p class="mt">No appointments today.</p>';
  $("all").innerHTML=all.length?all.map(item).join(""):'<p class="mt">No appointments have been booked yet.</p>';
- $("th").textContent="Today’s Appointments ("+t.filter(live).length+")";$("ah").textContent=L.allTitle+" ("+all.length+")";renderFU(td)}
+ $("th").textContent="Today’s Appointments ("+t.filter(live).length+")";$("ah").textContent=L.allTitle+" ("+all.length+")";renderFU(td);renderOB()}
 function renderFU(td){var best={};bills().forEach(function(b){if(!b.next_visit)return;var k=pd(b.phone).length>=7?"p"+pd(b.phone):"n"+String(b.name).trim().toLowerCase();if(!best[k]||b.created>best[k].created)best[k]=b});
  var F=Object.keys(best).map(function(k){return best[k]}).filter(function(b){return b.next_visit>=td}).sort(function(a,b){return a.next_visit<b.next_visit?-1:1});
  $("fh").textContent="Upcoming Follow-ups ("+F.length+")";
@@ -312,6 +313,22 @@ $("bbody").oninput=function(e){var tr=e.target.closest("tr"),f=e.target.dataset.
  if(f=="n"){var m=C.items.filter(function(x){return x.n.toLowerCase()==e.target.value.trim().toLowerCase()})[0];if(m){BR[i].p=m.p;tr.querySelector('[data-f="p"]').value=m.p}}bTot()};
 $("bbody").onclick=function(e){var b=e.target.closest("button");if(!b)return;BR.splice(+b.closest("tr").dataset.i,1);if(!BR.length)BR.push({n:"",p:"",q:1});bRows()};
 $("newbill").onclick=function(){bOpen(null)};
+function obKey(b){var d=pd(b.phone);return d.length>=7?"p"+d:"n"+String(b.name||"").trim().toLowerCase()}
+function obBal(b){return Math.round((+b.balance||0)*100)/100}
+function obRcv(b){return Math.round(((+b.total||0)-obBal(b))*100)/100}
+function renderOB(){var q=($("obq").value||"").toLowerCase(),m={},T=0,N=0;
+ bills().forEach(function(b){if(obBal(b)>0)(m[obKey(b)]=m[obKey(b)]||[]).push(b)});
+ var G=Object.keys(m).map(function(k){var l=m[k].slice().sort(function(a,b){return a.bill_date<b.bill_date?-1:1}),la=l[l.length-1],g={l:l,name:la.name,phone:la.phone,due:0,billed:0,rec:0};l.forEach(function(b){g.due+=obBal(b);g.billed+=b.total;g.rec+=obRcv(b)});return g}).sort(function(a,b){return b.due-a.due});
+ G.forEach(function(g){T+=g.due;N++});
+ $("obh").textContent="Outstanding Balances (patient-wise)"+(N?" ("+N+" · "+fm(T)+")":" (0)");
+ var V=G.filter(function(g){return !q||(g.name+" "+g.phone).toLowerCase().indexOf(q)>-1});
+ $("obl").innerHTML=V.length?(q?"":'<p style="margin:0 0 8px;font-weight:600">'+N+' patient(s) with an unpaid balance · Total outstanding <span style="color:var(--dng)">'+fm(T)+'</span></p>')+V.map(function(g){return '<div class="item" style="flex-direction:column;align-items:stretch"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><b>'+esc(g.name)+'</b><span>'+esc(g.phone||"—")+' · '+g.l.length+' unpaid bill(s)</span></div><div style="text-align:right"><span>Billed '+fm(g.billed)+' · Received '+fm(g.rec)+'</span><br><b style="color:var(--dng)">Balance due '+fm(g.due)+'</b></div></div>'+g.l.map(function(b){return '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--bd);padding-top:6px;margin-top:6px;font-size:.85rem"><span>INV-'+String(b.id).slice(-8)+' · '+esc(b.bill_date)+' · '+esc(b.items.map(function(x){return x.n+" ×"+x.q}).join(", "))+'</span><span>Total '+fm(b.total)+' · Received '+fm(obRcv(b))+' · <b style="display:inline;color:var(--dng)">Balance '+fm(obBal(b))+'</b> <button class="edit" data-rc="'+b.id+'" style="padding:5px 10px;margin-left:6px">Receive payment</button></span></div>'}).join("")+'</div>'}).join(""):'<p class="mt">'+(q?"No matching patient with an unpaid balance.":"No outstanding balances.")+'</p>'}
+$("obq").oninput=renderOB;
+$("obl").onclick=function(e){var r=e.target.closest("[data-rc]");if(!r)return;var L=bills(),b=L.filter(function(x){return String(x.id)==r.dataset.rc})[0];if(!b)return;var due=obBal(b);
+ var v=prompt("Amount received now (balance due "+fm(due)+"):",due);if(v===null)return;var a=Math.round(parseFloat(v)*100)/100;
+ if(!(a>0)||a>due){xMsg("Enter an amount greater than 0 and not more than "+fm(due)+".");return}
+ b.received=Math.round((obRcv(b)+a)*100)/100;b.balance=Math.round((due-a)*100)/100;
+ (dbOn()?billSave(b):Promise.resolve()).then(function(){setBills(L);renderOB();xMsg("Payment of "+fm(a)+" recorded.")},function(er){xMsg("Could not record the payment: "+er.message)})};
 $("nvok").onclick=function(){$("nvd").classList.remove("open");$("bnext").focus()};
 $("nvskip").onclick=function(){$("nvd").classList.remove("open");bSave(true)};
 $("bn").oninput=$("bph").oninput=bHist;
