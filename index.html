@@ -96,6 +96,7 @@ button{font:inherit;cursor:pointer;border:0;border-radius:9px;padding:11px 14px}
 <div style="overflow-x:auto"><table id="btbl"><thead><tr><th>Sr No</th><th>Item name</th><th>Price</th><th>Qty</th><th>Total</th><th></th></tr></thead><tbody id="bbody"></tbody></table></div>
 <button class="ghost" id="badd" style="margin-top:8px">+ Add item</button>
 <div style="margin-top:12px;text-align:right"><span style="font-size:1.2rem">Total: <b id="btot"></b></span></div>
+<div style="margin-top:12px"><div style="font-size:.85rem;color:var(--mut)">Mode of Payment</div><div style="display:flex;gap:22px;margin-top:6px"><label style="display:flex;align-items:center;gap:6px;margin:0;color:var(--tx);font-size:.95rem"><input type="radio" name="bmode" value="Cash" checked style="width:auto;margin:0"> Cash</label><label style="display:flex;align-items:center;gap:6px;margin:0;color:var(--tx);font-size:.95rem"><input type="radio" name="bmode" value="Bank" style="width:auto;margin:0"> Bank</label></div></div>
 <div class="row" style="margin-top:10px;align-items:end"><div><label for="brc">Received payment</label><input type="number" id="brc" min="0" step="any" placeholder="0"></div><div><button class="ghost" id="bfull" type="button" style="width:100%">Full amount</button></div></div>
 <div style="text-align:right;margin-top:8px;font-size:1.05rem">Balance amount: <b id="bbal"></b></div>
 <div class="err" id="berr"></div>
@@ -104,6 +105,7 @@ button{font:inherit;cursor:pointer;border:0;border-radius:9px;padding:11px 14px}
 <button class="ghost" id="bclose" style="width:100%;margin-top:8px">Close</button>
 </div></div>
 <div id="nvd" class="ov" style="z-index:30"><div class="box" style="max-width:380px"><h2 style="margin:0 0 8px">Next visit date</h2><p style="margin:0 0 16px">Please enter the next visit date in the box. Choose Skip to save the bill without it.</p><div style="display:flex;gap:10px"><button class="pri" id="nvok" style="margin:0">OK</button><button class="ghost" id="nvskip" style="flex:1">Skip</button></div></div></div>
+<div id="rpd" class="ov" style="z-index:40"><div class="box" style="max-width:380px;text-align:left"><h3 style="margin:0 0 4px">Receive payment</h3><p id="rpi" style="margin:0 0 10px;font-size:.85rem;color:var(--mut)"></p><label for="rpa">Amount received</label><input type="number" id="rpa" min="0" step="any"><div style="font-size:.85rem;color:var(--mut);margin:12px 0 6px">Mode of Payment</div><div style="display:flex;gap:22px"><label style="display:flex;align-items:center;gap:6px;margin:0;color:var(--tx);font-size:.95rem"><input type="radio" name="rpm" value="Cash" checked style="width:auto;margin:0"> Cash</label><label style="display:flex;align-items:center;gap:6px;margin:0;color:var(--tx);font-size:.95rem"><input type="radio" name="rpm" value="Bank" style="width:auto;margin:0"> Bank</label></div><div class="err" id="rpe"></div><div style="display:flex;gap:10px;margin-top:10px"><button class="pri" id="rpok" style="margin:0">Save payment</button><button class="ghost" id="rpx" style="flex:1">Cancel</button></div></div></div>
 <div id="lock" style="position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;padding:16px;z-index:30"><div class="box"><h2>Staff Sign In</h2><input id="le1" type="email" placeholder="Email" autocomplete="username" style="margin-bottom:8px"><input id="lp" type="password" placeholder="Password" autocomplete="current-password"><button class="pri" id="lgo">Sign in</button><div class="err" id="lerr"></div></div></div>
 <div id="modal" role="dialog" aria-modal="true"><div class="box">
   <div class="tick">✅</div><h2 id="mh">Appointment Confirmed</h2>
@@ -266,6 +268,23 @@ function calc(items){var sub=0;items.forEach(function(x){sub+=x.p*x.q});sub=Math
 function dbPullT(t,ord){var all=[];function pg(i){return dbReq("GET",t+"?select=*&order="+ord,null,{Range:i+"-"+(i+999),"Range-Unit":"items"}).then(function(r){all=all.concat(r);return r.length==1000?pg(i+1000):all})}return pg(0)}
 function billSave(b){return dbReq("POST","bills?on_conflict=id",[b],{Prefer:"resolution=merge-duplicates,return=minimal"})}
 function billDel(id){return dbReq("DELETE","bills?id=eq."+encodeURIComponent(id))}
+function lBal(b){return Math.round((+b.balance||0)*100)/100}
+function lRcv(b){return Math.round(((+b.total||0)-lBal(b))*100)/100}
+function lDt(t){var d=new Date(t);return isNaN(d)?"—":d.toLocaleString("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}
+function lEntries(b){var P=(b.payments||[]).map(function(p){return{t:p.t,a:+p.a||0,n:p.n||"",m:p.m||""}}).sort(function(x,y){return x.t<y.t?-1:1}),s=0;P.forEach(function(p){s+=p.a});
+ var d=Math.round((lRcv(b)-s)*100)/100;if(d>0.004)P.unshift({t:b.created,a:d,n:"Received earlier"});
+ var run=+b.total||0;return P.map(function(p,i){run=Math.round((run-p.a)*100)/100;return{t:p.t,a:p.a,m:p.m||"",bal:run,b:b,n:p.n||(i==0&&Math.abs(new Date(p.t)-new Date(b.created))<120000?"Received at billing":"Payment received")}})}
+function printLedger(L,name,phone){var w=window.open("","_blank");if(!w)return false;
+ var E=[],tb=0,tr=0,td=0;L.forEach(function(b){E=E.concat(lEntries(b));tb+=+b.total||0;tr+=lRcv(b);td+=lBal(b)});E.sort(function(x,y){return x.t<y.t?-1:1});
+ var bl=L.slice().sort(function(a,b){return a.bill_date<b.bill_date?-1:1}).map(function(b){return "<tr><td>INV-"+String(b.id).slice(-8)+"</td><td>"+esc(b.bill_date)+"</td><td class=r>"+fm(b.total)+"</td><td class=r>"+fm(lRcv(b))+"</td><td class=r>"+fm(lBal(b))+"</td></tr>"}).join("");
+ var py=E.length?E.map(function(e,i){return "<tr><td>"+(i+1)+"</td><td>"+lDt(e.t)+"</td><td>INV-"+String(e.b.id).slice(-8)+"</td><td>"+esc(e.n)+"</td><td>"+esc(e.m||"—")+"</td><td class=r>"+fm(e.a)+"</td><td class=r>"+fm(e.bal)+"</td></tr>"}).join(""):"<tr><td colspan=7>No payments received yet.</td></tr>";
+ w.document.write("<!doctype html><html><head><meta charset=utf-8><title>Payment ledger</title><style>body{font-family:Arial,sans-serif;max-width:780px;margin:24px auto;color:#111;padding:0 16px}table{width:100%;border-collapse:collapse;margin:6px 0 14px;font-size:14px}th,td{border-bottom:1px solid #ccc;padding:7px 8px;text-align:left}.r{text-align:right}.f td{font-weight:bold;border-top:2px solid #333}h1{margin:0 0 4px}h3{margin:16px 0 0}.m{color:#555}</style></head><body>"
+ +(C.logo?"<img src=\""+esc(C.logo)+"\" style=\"height:52px\"><br>":"")+"<h1>"+esc(C.clinic)+"</h1><div class=m>Payment Ledger · Generated "+lDt(new Date())+"</div><hr>"
+ +"<p><b>"+esc(name)+"</b><br>"+esc(phone||"")+"</p>"
+ +"<h3>Bills</h3><table><tr><th>Invoice</th><th>Bill date</th><th class=r>Total</th><th class=r>Received</th><th class=r>Balance</th></tr>"+bl+"<tr class=f><td colspan=2>Total</td><td class=r>"+fm(tb)+"</td><td class=r>"+fm(tr)+"</td><td class=r>"+fm(td)+"</td></tr></table>"
+ +"<h3>Payments received</h3><table><tr><th>Sr No</th><th>Date &amp; time</th><th>Invoice</th><th>Description</th><th>Mode</th><th class=r>Amount received</th><th class=r>Bill balance after</th></tr>"+py+"<tr class=f><td colspan=5>Total received</td><td class=r>"+fm(tr)+"</td><td></td></tr></table>"
+ +"<p style=\"font-size:16px\"><b>Balance due: "+fm(td)+"</b></p></body></html>");
+ w.document.close();w.focus();setTimeout(function(){w.print()},300);return true}
 function printBill(b){var w=window.open("","_blank");if(!w)return false;
  var r=b.items.map(function(x,i){return "<tr><td>"+(i+1)+"</td><td>"+esc(x.n)+"</td><td class=r>"+fm(x.p)+"</td><td class=r>"+x.q+"</td><td class=r>"+fm(x.p*x.q)+"</td></tr>"}).join("");
  w.document.write("<!doctype html><html><head><meta charset=utf-8><title>Invoice</title><style>body{font-family:Arial,sans-serif;max-width:720px;margin:24px auto;color:#111;padding:0 16px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #ccc;padding:8px;text-align:left}.r{text-align:right}.t td{border:0;padding:4px 8px}h1{margin:0 0 4px}.m{color:#555}</style></head><body>"
@@ -304,7 +323,7 @@ function nv(a){var n=bills().filter(function(b){return String(b.appt_id)==String
 function bOpen(id){BA=id==null?null:load().filter(function(a){return String(a.id)==id})[0];if(id!=null&&!BA)return;BR=[{n:"",p:"",q:1}];BS=false;
  $("bpat").hidden=!!BA;$("bh").textContent=BA?(C.patch||"Patches"):"Create Bill";$("bp").textContent=BA?BA.name+" · "+BA.svc+" · "+dlong(BA.date)+" "+t12(BA.time):"New bill for a patient";
  if(!BA){$("bn").value="";$("bph").value="";$("bsv").innerHTML=C.services.map(function(x){return "<option>"+esc(x)+"</option>"}).join("")}
- $("bnext").value="";$("bnext").min=iso(new Date());$("brc").value="";$("berr").textContent="";$("bdone").hidden=true;$("bsave").hidden=false;$("bsave").disabled=false;
+ $("bnext").value="";$("bnext").min=iso(new Date());$("brc").value="";document.querySelector('input[name=bmode][value=Cash]').checked=true;$("berr").textContent="";$("bdone").hidden=true;$("bsave").hidden=false;$("bsave").disabled=false;
  $("bitems").innerHTML=C.items.map(function(x){return '<option value="'+esc(x.n)+'">'}).join("");bRows();$("bm").classList.add("open");bHist();if(dbOn())dbPullT("bills","created.desc").then(function(r){setBills(r);if($("bm").classList.contains("open"))bHist()},function(){})}
 function bValid(){return BR.filter(function(r){return String(r.n).trim()&&String(r.p)!==""&&+r.p>=0&&+r.q>0}).map(function(r){return{n:String(r.n).trim(),p:+r.p,q:+r.q}})}
 function bTot(){[].forEach.call($("bbody").rows,function(tr,i){var r=BR[i];tr.querySelector(".rt").textContent=fm((+r.p||0)*(+r.q||0))});var c=calc(bValid());$("btot").textContent=fm(c.total);var rc=+$("brc").value||0,bl=Math.round((c.total-rc)*100)/100;$("bbal").textContent=rc>c.total?"Received is more than the total":fm(bl);$("bbal").style.color=(rc>c.total||bl>0)?"var(--dng)":"inherit";return c}
@@ -313,22 +332,35 @@ $("bbody").oninput=function(e){var tr=e.target.closest("tr"),f=e.target.dataset.
  if(f=="n"){var m=C.items.filter(function(x){return x.n.toLowerCase()==e.target.value.trim().toLowerCase()})[0];if(m){BR[i].p=m.p;tr.querySelector('[data-f="p"]').value=m.p}}bTot()};
 $("bbody").onclick=function(e){var b=e.target.closest("button");if(!b)return;BR.splice(+b.closest("tr").dataset.i,1);if(!BR.length)BR.push({n:"",p:"",q:1});bRows()};
 $("newbill").onclick=function(){bOpen(null)};
+var OBG=[];
 function obKey(b){var d=pd(b.phone);return d.length>=7?"p"+d:"n"+String(b.name||"").trim().toLowerCase()}
 function obBal(b){return Math.round((+b.balance||0)*100)/100}
 function obRcv(b){return Math.round(((+b.total||0)-obBal(b))*100)/100}
 function renderOB(){var q=($("obq").value||"").toLowerCase(),m={},T=0,N=0;
  bills().forEach(function(b){if(obBal(b)>0)(m[obKey(b)]=m[obKey(b)]||[]).push(b)});
- var G=Object.keys(m).map(function(k){var l=m[k].slice().sort(function(a,b){return a.bill_date<b.bill_date?-1:1}),la=l[l.length-1],g={l:l,name:la.name,phone:la.phone,due:0,billed:0,rec:0};l.forEach(function(b){g.due+=obBal(b);g.billed+=b.total;g.rec+=obRcv(b)});return g}).sort(function(a,b){return b.due-a.due});
+ var G=Object.keys(m).map(function(k){var l=m[k].slice().sort(function(a,b){return a.bill_date<b.bill_date?-1:1}),la=l[l.length-1],g={key:k,l:l,name:la.name,phone:la.phone,due:0,billed:0,rec:0};l.forEach(function(b){g.due+=obBal(b);g.billed+=b.total;g.rec+=obRcv(b)});return g}).sort(function(a,b){return b.due-a.due});
  G.forEach(function(g){T+=g.due;N++});
  $("obh").textContent="Outstanding Balances (patient-wise)"+(N?" ("+N+" · "+fm(T)+")":" (0)");
- var V=G.filter(function(g){return !q||(g.name+" "+g.phone).toLowerCase().indexOf(q)>-1});
- $("obl").innerHTML=V.length?(q?"":'<p style="margin:0 0 8px;font-weight:600">'+N+' patient(s) with an unpaid balance · Total outstanding <span style="color:var(--dng)">'+fm(T)+'</span></p>')+V.map(function(g){return '<div class="item" style="flex-direction:column;align-items:stretch"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><b>'+esc(g.name)+'</b><span>'+esc(g.phone||"—")+' · '+g.l.length+' unpaid bill(s)</span></div><div style="text-align:right"><span>Billed '+fm(g.billed)+' · Received '+fm(g.rec)+'</span><br><b style="color:var(--dng)">Balance due '+fm(g.due)+'</b></div></div>'+g.l.map(function(b){return '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--bd);padding-top:6px;margin-top:6px;font-size:.85rem"><span>INV-'+String(b.id).slice(-8)+' · '+esc(b.bill_date)+' · '+esc(b.items.map(function(x){return x.n+" ×"+x.q}).join(", "))+'</span><span>Total '+fm(b.total)+' · Received '+fm(obRcv(b))+' · <b style="display:inline;color:var(--dng)">Balance '+fm(obBal(b))+'</b> <button class="edit" data-rc="'+b.id+'" style="padding:5px 10px;margin-left:6px">Receive payment</button></span></div>'}).join("")+'</div>'}).join(""):'<p class="mt">'+(q?"No matching patient with an unpaid balance.":"No outstanding balances.")+'</p>'}
+ var V=G.filter(function(g){return !q||(g.name+" "+g.phone).toLowerCase().indexOf(q)>-1});OBG=V;
+ $("obl").innerHTML=V.length?(q?"":'<p style="margin:0 0 8px;font-weight:600">'+N+' patient(s) with an unpaid balance · Total outstanding <span style="color:var(--dng)">'+fm(T)+'</span></p>')+V.map(function(g,gi){return '<div class="item" style="flex-direction:column;align-items:stretch"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><b>'+esc(g.name)+'</b><span>'+esc(g.phone||"—")+' · '+g.l.length+' unpaid bill(s)</span><br><button class="edit" data-lg="'+gi+'" style="padding:5px 10px;margin-top:6px">🖨 Print ledger</button></div><div style="text-align:right"><span>Billed '+fm(g.billed)+' · Received '+fm(g.rec)+'</span><br><b style="color:var(--dng)">Balance due '+fm(g.due)+'</b></div></div>'+g.l.map(function(b){return '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--bd);padding-top:6px;margin-top:6px;font-size:.85rem"><span>INV-'+String(b.id).slice(-8)+' · '+esc(b.bill_date)+' · '+esc(b.items.map(function(x){return x.n+" ×"+x.q}).join(", "))+'</span><span>Total '+fm(b.total)+' · Received '+fm(obRcv(b))+' · <b style="display:inline;color:var(--dng)">Balance '+fm(obBal(b))+'</b> <button class="edit" data-rc="'+b.id+'" style="padding:5px 10px;margin-left:6px">Receive payment</button><button class="edit" data-lb="'+b.id+'" style="padding:5px 10px;margin-left:6px">Ledger</button></span></div>'}).join("")+'</div>'}).join(""):'<p class="mt">'+(q?"No matching patient with an unpaid balance.":"No outstanding balances.")+'</p>'}
 $("obq").oninput=renderOB;
-$("obl").onclick=function(e){var r=e.target.closest("[data-rc]");if(!r)return;var L=bills(),b=L.filter(function(x){return String(x.id)==r.dataset.rc})[0];if(!b)return;var due=obBal(b);
- var v=prompt("Amount received now (balance due "+fm(due)+"):",due);if(v===null)return;var a=Math.round(parseFloat(v)*100)/100;
- if(!(a>0)||a>due){xMsg("Enter an amount greater than 0 and not more than "+fm(due)+".");return}
- b.received=Math.round((obRcv(b)+a)*100)/100;b.balance=Math.round((due-a)*100)/100;
- (dbOn()?billSave(b):Promise.resolve()).then(function(){setBills(L);renderOB();xMsg("Payment of "+fm(a)+" recorded.")},function(er){xMsg("Could not record the payment: "+er.message)})};
+$("obl").onclick=function(e){var lg=e.target.closest("[data-lg]"),lb=e.target.closest("[data-lb]");
+ if(lg){var g=OBG[+lg.dataset.lg];if(g&&!printLedger(bills().filter(function(b){return obKey(b)==g.key}),g.name,g.phone))xMsg("Please allow pop-ups to print the ledger.");return}
+ if(lb){var bb=bills().filter(function(y){return String(y.id)==lb.dataset.lb})[0];if(bb&&!printLedger([bb],bb.name,bb.phone))xMsg("Please allow pop-ups to print the ledger.");return}
+ var r=e.target.closest("[data-rc]");if(!r)return;var L=bills(),b=L.filter(function(x){return String(x.id)==r.dataset.rc})[0];if(!b)return;var due=obBal(b);
+ openRP(b,L,due)};
+
+/* receive payment dialog */
+var RP=null;
+function openRP(b,L,due){RP={b:b,L:L,due:due};$("rpi").textContent=b.name+" · INV-"+String(b.id).slice(-8)+" · Balance due "+fm(due);$("rpa").value=due;$("rpe").textContent="";document.querySelector('input[name=rpm][value=Cash]').checked=true;$("rpd").classList.add("open");$("rpa").focus()}
+$("rpx").onclick=function(){$("rpd").classList.remove("open")};
+$("rpa").onkeydown=function(e){if(e.key=="Enter")$("rpok").click()};
+$("rpok").onclick=function(){if(!RP)return;var a=Math.round(parseFloat($("rpa").value)*100)/100,b=RP.b,due=RP.due;
+ if(!(a>0)||a>due){$("rpe").textContent="Enter an amount greater than 0 and not more than "+fm(due)+".";return}
+ var m=document.querySelector('input[name=rpm]:checked').value;
+ b.received=Math.round((obRcv(b)+a)*100)/100;b.balance=Math.round((due-a)*100)/100;(b.payments=b.payments||[]).push({t:new Date().toISOString(),a:a,m:m});
+ $("rpok").disabled=true;
+ (dbOn()?billSave(b):Promise.resolve()).then(function(){$("rpok").disabled=false;$("rpd").classList.remove("open");setBills(RP.L);renderOB();xMsg("Payment of "+fm(a)+" ("+m+") recorded.")},function(er){$("rpok").disabled=false;$("rpe").textContent="Could not record the payment: "+er.message})};
 $("nvok").onclick=function(){$("nvd").classList.remove("open");$("bnext").focus()};
 $("nvskip").onclick=function(){$("nvd").classList.remove("open");bSave(true)};
 $("bn").oninput=$("bph").oninput=bHist;
@@ -343,7 +375,7 @@ function bSave(force){var it=bValid(),E=$("berr");
  var c0=calc(it),rc=+$("brc").value||0;if(rc<0)return E.textContent="Received amount cannot be negative.";if(rc>c0.total)return E.textContent="Received amount cannot be more than the total bill.";
  if(!$("bnext").value&&!force){$("nvd").classList.add("open");$("nvok").focus();return}
  var c=calc(it);
- var n=new Date(),b={id:Date.now(),appt_id:BA?Number(BA.id):null,name:BA?BA.name:$("bn").value.trim(),phone:BA?BA.phone:$("bph").value.trim(),svc:BA?BA.svc:$("bsv").value,bill_date:iso(n),next_visit:$("bnext").value||"",items:it,subtotal:c.total,total:c.total,received:rc,balance:Math.round((c.total-rc)*100)/100,created:n.toISOString()};
+ var n=new Date(),b={id:Date.now(),appt_id:BA?Number(BA.id):null,name:BA?BA.name:$("bn").value.trim(),phone:BA?BA.phone:$("bph").value.trim(),svc:BA?BA.svc:$("bsv").value,bill_date:iso(n),next_visit:$("bnext").value||"",items:it,subtotal:c.total,total:c.total,received:rc,balance:Math.round((c.total-rc)*100)/100,payments:rc>0?[{t:n.toISOString(),a:rc,m:(document.querySelector('input[name=bmode]:checked')||{}).value||"Cash"}]:[],created:n.toISOString()};
  E.textContent="";$("bsave").disabled=true;
  (dbOn()?billSave(b):Promise.resolve()).then(function(){var a=bills();a.unshift(b);setBills(a);BS=b;$("bsave").hidden=true;$("bdone").hidden=false;$("bmsg").textContent="Bill saved ✓  Total: "+fm(b.total)+" · Received: "+fm(rc)+" · Balance: "+fm(b.balance);refresh();bHist()},function(er){$("bsave").disabled=false;E.textContent="Could not save the bill: "+er.message})};
 $("bprint").onclick=function(){if(BS&&!printBill(BS))$("berr").textContent="Please allow pop-ups to print the invoice."};
