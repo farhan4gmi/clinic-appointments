@@ -80,7 +80,7 @@ var DEF={clinic:"Wellness Therapy Clinic",tagline:"Appointment booking & calenda
 L:{formTitle:"New Appointment",editTitle:"Edit Appointment",book:"Book Appointment",update:"Update Appointment",name:"Full Name",phone:"Mobile / WhatsApp Number",svc:"Therapy Service",date:"Date",time:"Time",reason:"Reason for Appointment",allTitle:"All Appointments"},
 P:{name:"Patient’s full name",phone:"e.g. 0300 1234567",reason:"Briefly describe the reason for the visit"},
 services:["Physiotherapy","Speech Therapy","Occupational Therapy","Psychological Counseling","Behavioral Therapy"],
-statuses:["Scheduled","Completed","Cancelled","No-show"],start:"10:00",end:"18:00",step:30,closed:[],
+statuses:["Scheduled","Completed","Cancelled","No-show","Closed"],start:"10:00",end:"18:00",step:30,closed:[],
 wa:"Dear {name},\n\nYour appointment at {clinic} has been confirmed.\n\nService: {service}\nDate: {date}\nTime: {time}\nReason: {reason}\n\nPlease arrive 10 minutes before your scheduled time. If you need to reschedule, kindly contact us in advance.\n\nThank you,\n{clinic}",patch:"Patches",cur:"Rs",items:[{n:"Consultation",p:1500},{n:"Therapy Session",p:2500},{n:"Follow-up Visit",p:1000},{n:"Medicine / Supplies",p:500}],waf:"Dear {name},\n\nThis is a friendly reminder of your next visit at {clinic} on {date}.\n\nService: {service}\n\nIf you need to reschedule, please contact us in advance.\n\nThank you,\n{clinic}"};
 var LN={formTitle:"Form heading (new)",editTitle:"Form heading (edit)",book:"Book button",update:"Update button",name:"Name field label",phone:"Phone field label",svc:"Service field label",date:"Date field label",time:"Time field label",reason:"Reason field label",allTitle:"All-appointments heading"};
 var PN={name:"Name placeholder",phone:"Phone placeholder",reason:"Reason placeholder"};
@@ -91,7 +91,7 @@ function t12(t){var h=+t.slice(0,2);return (h%12||12)+":"+t.slice(3)+" "+(h<12?"
 function toM(t){var p=t.split(":");return +p[0]*60+ +p[1]}
 function jget(k,f){try{var r=localStorage.getItem(k);return r?JSON.parse(r):f}catch(e){return f}}
 function jset(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}
-function cfg(){var c=jget(KC,{}),d=JSON.parse(JSON.stringify(DEF));for(var k in c){if(k=="L"||k=="P")Object.assign(d[k],c[k]);else d[k]=c[k]}return d}
+function cfg(){var c=jget(KC,{}),d=JSON.parse(JSON.stringify(DEF));for(var k in c){if(k=="L"||k=="P")Object.assign(d[k],c[k]);else d[k]=c[k]}if(d.statuses.indexOf("Closed")<0)d.statuses.push("Closed");return d}
 function sha256(ascii){
  function rr(v,a){return (v>>>a)|(v<<(32-a))}
  var mp=Math.pow,mw=mp(2,32),i,j,result="",words=[],al=ascii.length*8,hash=[],k=[],pc=0,ic={};
@@ -252,6 +252,7 @@ function detail(k){var B=billsF(),all=jget(KB,[]),n=new Date(),td=n.getFullYear(
  else if(k=="avg"){ti="Average bill";o=tAvg(B)}
  else if(k=="items"||k=="qty"){ti=k=="qty"?"Quantity sold by item":"Items sold";o=tItems(B,"q")}
  else if(k=="rev"){ti="Revenue by item";o=tItems(B,"r")}
+ else if(k=="cl"){ti="Closed appointments";nt=rnote();o=tClosed()}
  else if(k=="pm"){ti="Payments received — Cash vs Bank";nt=pnote();o=tPay(payList())}
  else if(k=="rec"){ti="Received payments";o=tBills(B)}
  else if(k=="bal"){ti="Balance due — patient wise";nt="All bills (not affected by the filters)";o=tBal()}
@@ -337,6 +338,13 @@ $("rpok").onclick=function(){if(!RP)return;var a=Math.round(parseFloat($("rpa").
  b.received=Math.round((rcv(b)+a)*100)/100;b.balance=Math.round((due-a)*100)/100;(b.payments=b.payments||[]).push({t:new Date().toISOString(),a:a,m:m});
  $("rpok").disabled=true;
  (dbOn()?billSave(b):Promise.resolve()).then(function(){$("rpok").disabled=false;$("rpd").classList.remove("open");jset(KB,RP.L);sal();toast("Payment of "+fm(a)+" ("+m+") recorded.")},function(x){$("rpok").disabled=false;$("rpe").textContent="Could not record the payment: "+x.message})};
+/* closed appointments */
+function isCl(a){var s=a.status||"Scheduled";return s=="Closed"||s=="Completed"}
+function rnote(){var f=$("ff").value,t=$("fto").value,s=$("fs").value,st=$("ft").value,q=$("fq").value,p=[];if(f)p.push("From "+f);if(t)p.push("To "+t);if(s)p.push("Service: "+s);if(st)p.push("Status: "+st);if(q)p.push("Search: "+q);return p.length?"Filters applied — "+p.join(" · "):"All appointments (no filters)"}
+function tClosed(){var A=filtered(),Cl=A.filter(isCl),op=A.filter(function(a){return (a.status||"Scheduled")!="Cancelled"&&!isCl(a)}),cn=A.filter(function(a){return a.status=="Cancelled"});
+ return{stats:[["Closed",Cl.length],["Still open",op.length],["Cancelled",cn.length],["Total appointments",A.length]],head:["Date","Time","Patient","Phone","Service","Reason","Status"],right:[],rows:Cl.slice().sort(function(x,y){return (y.date+y.time)<(x.date+x.time)?-1:1}).map(function(a){return[a.date,t12(a.time),a.name,a.phone,a.svc,a.reason,a.status||"Scheduled"]}),foot:["Closed ("+Cl.length+")","","","","","",""]}}
+$("cards").onclick=function(e){var c=e.target.closest("[data-d]");if(c)detail(c.dataset.d)};
+$("cards").onkeydown=function(e){var c=e.target;if((e.key=="Enter"||e.key==" ")&&c.dataset&&c.dataset.d){e.preventDefault();detail(c.dataset.d)}};
 $("dcl").onclick=function(){$("dm").classList.remove("open")};
 $("dm").onclick=function(e){if(e.target.id=="dm")$("dm").classList.remove("open")};
 document.addEventListener("keydown",function(e){if(e.key=="Escape")$("dm").classList.remove("open")});
@@ -376,7 +384,7 @@ return '<div class="card'+(dk?' ck':'')+'"'+(dk?' data-d="'+dk+'" tabindex="0" r
 function kc(l,v,k){return '<div class="k'+(k?' ck':'')+'"'+(k?' data-d="'+k+'" tabindex="0" role="button"':'')+'><b>'+v+'</b><span>'+esc(l)+'</span></div>'}
 function rep(){var A=filtered(),n=new Date(),td=n.getFullYear()+"-"+pad(n.getMonth()+1)+"-"+pad(n.getDate());
 var S=function(a){return a.status||"Scheduled"},st=grp(A,S);
-$("cards").innerHTML=kc("Total appointments",A.length)+kc("Unique patients",Object.keys(grp(A,function(a){return a.phone.replace(/\D/g,"")})).length)+kc("Today",A.filter(function(a){return a.date==td}).length)+kc("Upcoming",A.filter(function(a){return a.date>=td&&S(a)!="Cancelled"}).length)+C.statuses.map(function(s){return kc(s,st[s]||0)}).join("");
+$("cards").innerHTML=kc("Total appointments",A.length)+kc("Unique patients",Object.keys(grp(A,function(a){return a.phone.replace(/\D/g,"")})).length)+kc("Today",A.filter(function(a){return a.date==td}).length)+kc("Upcoming",A.filter(function(a){return a.date>=td&&S(a)!="Cancelled"}).length)+kc("Closed appointments · "+A.filter(function(a){return S(a)!="Cancelled"&&!isCl(a)}).length+" still open",A.filter(isCl).length,"cl")+C.statuses.map(function(s){return kc(s,st[s]||0)}).join("");
 $("bars").innerHTML=bars("By service",grp(A,function(a){return a.svc}))+bars("By status",st)
 +bars("By weekday",grp(A,function(a){return new Date(a.date+"T00:00:00").getDay()}),1,function(x){return DN[x]})
 +bars("By time slot",grp(A,function(a){return a.time}),1,t12)+bars("By month",grp(A,function(a){return a.date.slice(0,7)}),1);
@@ -425,7 +433,7 @@ else if(b.dataset.x=="da"){if(confirm("Delete ALL appointments? This cannot be u
 else if(b.dataset.x=="rs"){if(confirm("Reset all settings to default?")){var fin=function(){try{localStorage.removeItem(KC)}catch(x){}location.reload()};if(dbOn()){var dv=JSON.parse(JSON.stringify(DEF));delete dv.ps;delete dv.ph;delete dv.pass;dbCfgSet(dv).then(fin,function(x){toast("Database error: "+x.message)})}else fin()}}});
 function save(){var np=$("npw")?$("npw").value:"";if(np){if(np.length<6)return toast("New password must be at least 6 characters.");if(np!==$("npw2").value)return toast("New passwords do not match.");setPw(D,np)}delete D.pass;var tr=function(a){return a.map(function(x){return x.trim()}).filter(Boolean)};D.services=tr(D.services);D.statuses=tr(D.statuses);D.items=(D.items||[]).filter(function(x){return String(x.n).trim()}).map(function(x){return{n:String(x.n).trim(),p:+x.p||0}});
 if(!D.services.length)return toast("Add at least one therapy service.");
-["Scheduled","Cancelled"].forEach(function(s){if(D.statuses.indexOf(s)<0)D.statuses.push(s)});
+["Scheduled","Cancelled","Closed"].forEach(function(s){if(D.statuses.indexOf(s)<0)D.statuses.push(s)});
 if(toM(D.end)<=toM(D.start))return toast("Closing time must be after opening time.");
 if(!D.clinic.trim())return toast("Clinic name is required.");
 if(!jset(KC,D))return toast("Could not save settings.");
